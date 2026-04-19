@@ -1,0 +1,3713 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="P.A.N.D.A.">
+<title>P.A.N.D.A. — Programa de Análise e Neutralização de Decisões Adversárias</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<!-- Firebase Client SDK (CDN Compat v10) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a; --surface: #111; --surface2: #161616;
+    --border: #1e1e1e; --accent: #c8f135; --accent2: #ff4d00;
+    --text: #e8e8e8; --muted: #555; --danger: #ff3333;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; min-height:100vh; overflow-x:hidden; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:9999; opacity:.4; }
+
+  /* HEADER */
+  header { display:flex; align-items:center; justify-content:space-between; padding:18px 28px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:200; }
+  .logo { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:4px; color:var(--accent); }
+  .logo span { color:var(--muted); font-size:12px; font-family:'JetBrains Mono',monospace; font-weight:300; margin-left:10px; letter-spacing:2px; }
+  .header-right { display:flex; gap:10px; align-items:center; }
+
+  /* BUTTONS */
+  .btn { background:transparent; border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:1px; padding:7px 14px; cursor:pointer; transition:all .15s; text-transform:uppercase; }
+  .btn:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-primary { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
+  .btn-primary:hover { background:#d4ff40; border-color:#d4ff40; }
+  .btn-ai { background:linear-gradient(135deg,#1a1a1a,#222); border-color:var(--accent2); color:var(--accent2); }
+  .btn-ai:hover { background:var(--accent2); color:#fff; }
+  .btn-danger { border-color:var(--danger); color:var(--danger); }
+  .btn-danger:hover { background:var(--danger); color:#fff; }
+  .btn-sm { padding:5px 10px; font-size:10px; }
+
+  /* VIEWS */
+  .view { display:none; }
+  .view.active { display:block; }
+
+  /* HOME */
+  .home-hero { padding:36px 28px 22px; border-bottom:1px solid var(--border); }
+  .home-title { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:4px; color:var(--muted); margin-bottom:18px; }
+  .teams-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1px; background:var(--border); }
+  .team-card { background:var(--surface); padding:20px; cursor:pointer; transition:background .15s; position:relative; }
+  .team-card:hover { background:var(--surface2); }
+  .team-card-name { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:2px; color:var(--accent); margin-bottom:4px; }
+  .team-card-meta { color:var(--muted); font-size:10px; letter-spacing:1px; margin-bottom:12px; }
+  .team-card-games { display:flex; gap:6px; flex-wrap:wrap; }
+  .game-pill { border:1px solid var(--border); padding:3px 8px; font-size:10px; color:var(--muted); letter-spacing:1px; cursor:pointer; transition:all .12s; }
+  .game-pill:hover { border-color:var(--accent); color:var(--accent); }
+  .team-card-del { position:absolute; top:12px; right:12px; background:none; border:none; color:var(--border); cursor:pointer; font-size:16px; transition:color .15s; }
+  .team-card-del:hover { color:var(--danger); }
+  .empty-home { padding:60px 28px; text-align:center; color:var(--muted); font-size:11px; letter-spacing:2px; }
+  .empty-home div { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:3px; margin-bottom:8px; color:#333; }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:1100; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); padding:28px; width:420px; max-width:95vw; }
+  .modal-title { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:3px; color:var(--accent); margin-bottom:20px; }
+  .modal label { display:block; color:var(--muted); font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-bottom:6px; margin-top:14px; }
+  .modal input, .modal select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:8px 10px; outline:none; }
+  .modal input:focus, .modal select:focus { border-color:var(--accent); }
+  .modal-actions { display:flex; gap:10px; margin-top:22px; justify-content:flex-end; }
+
+  /* BREADCRUMB */
+  .breadcrumb { display:flex; align-items:center; gap:10px; padding:12px 28px; border-bottom:1px solid var(--border); background:var(--surface); font-size:11px; letter-spacing:1px; flex-wrap:wrap; }
+  .bc-link { color:var(--muted); cursor:pointer; transition:color .15s; text-transform:uppercase; }
+  .bc-link:hover { color:var(--accent); }
+  .bc-sep { color:var(--border); }
+  .bc-current { color:var(--accent); text-transform:uppercase; }
+
+  /* GAME BAR */
+  .game-bar { display:flex; gap:12px; align-items:center; padding:14px 28px; border-bottom:1px solid var(--border); background:var(--surface2); flex-wrap:wrap; }
+  .game-bar label { color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:2px; }
+  .game-bar input, .game-bar select { background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 10px; outline:none; transition:border-color .15s; }
+  .game-bar input:focus, .game-bar select:focus { border-color:var(--accent); }
+  .game-bar input { width:150px; }
+
+  /* STATS */
+  .stats-strip { display:grid; grid-template-columns:repeat(6,1fr); border-bottom:1px solid var(--border); }
+  .stat-box { padding:14px 20px; border-right:1px solid var(--border); }
+  .stat-box:last-child { border-right:none; }
+  .stat-label { color:var(--muted); font-size:9px; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
+  .stat-value { font-family:'Bebas Neue',sans-serif; font-size:28px; color:var(--accent); line-height:1; }
+
+  /* TABLE */
+  .table-section { padding:20px 28px; }
+  .section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .section-title { font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:3px; color:var(--muted); }
+  .table-wrapper { border:1px solid var(--border); overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:1100px; }
+  thead tr { background:var(--surface); border-bottom:2px solid var(--accent); }
+  th { padding:10px 8px; text-align:left; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); white-space:nowrap; font-weight:400; }
+  th:first-child { width:36px; padding-left:14px; }
+  tbody tr { border-bottom:1px solid var(--border); transition:background .1s; }
+  tbody tr:hover { background:rgba(200,241,53,.03); }
+  td { padding:3px; vertical-align:middle; }
+  td:first-child { padding-left:14px; color:var(--muted); font-size:11px; }
+  td input, td select { background:transparent; border:1px solid transparent; color:#ffffff; font-family:'JetBrains Mono',monospace; font-size:12px; padding:5px 7px; width:100%; outline:none; transition:all .1s; }
+  td select { color:#000; }
+  td select:not(:focus) { color:#ffffff; }
+  td input:focus, td select:focus { border-color:var(--accent); background:rgba(200,241,53,.05); }
+  td select { cursor:pointer; -webkit-appearance:none; }
+  td input::placeholder { color:var(--muted); }
+  .del-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; padding:4px 8px; transition:color .15s; line-height:1; }
+  .del-btn:hover { color:var(--danger); }
+  .empty-row td { text-align:center; padding:36px; color:var(--muted); font-size:11px; letter-spacing:2px; }
+  .add-row-btn { width:100%; background:transparent; border:none; border-top:1px solid var(--border); color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:11px; cursor:pointer; transition:all .15s; }
+  .add-row-btn:hover { background:rgba(200,241,53,.05); color:var(--accent); }
+
+  /* AI PANEL */
+  .ai-panel { margin:0 28px 28px; border:1px solid var(--accent2); background:rgba(255,77,0,.03); display:none; }
+  .ai-panel.visible { display:block; }
+  .ai-panel-header { padding:11px 18px; border-bottom:1px solid rgba(255,77,0,.2); display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .ai-panel-header > div { display:flex; flex-direction:column; gap:10px; }
+  .ai-panel-title { font-family:'Bebas Neue',sans-serif; font-size:15px; letter-spacing:3px; color:var(--accent2); }
+  .ai-tabs { display:flex; flex-wrap:wrap; gap:8px; }
+  .ai-tab-btn { border:1px solid var(--border); background:transparent; color:var(--text); font-size:11px; padding:6px 10px; cursor:pointer; transition:all .15s; }
+  .ai-tab-btn.active { border-color:var(--accent2); background:rgba(255,77,0,.15); color:var(--accent2); }
+  .ai-panel-body { padding:18px; line-height:1.8; color:#ccc; white-space:pre-wrap; min-height:120px; }
+  .ai-loading { display:flex; gap:6px; align-items:center; color:var(--muted); padding:20px; }
+  .dot { width:6px; height:6px; background:var(--accent2); border-radius:50%; animation:pulse 1.2s infinite; }
+  .dot:nth-child(2){animation-delay:.2s} .dot:nth-child(3){animation-delay:.4s}
+  @keyframes pulse{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+  /* TEAM VIEW */
+  .team-view-header { padding:24px 28px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+  .games-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:1px; background:var(--border); padding:0; }
+  .game-card { background:var(--surface); padding:18px; cursor:pointer; transition:background .15s; position:relative; }
+  .game-card:hover { background:var(--surface2); }
+  .game-card-name { font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:2px; color:var(--text); margin-bottom:4px; }
+  .game-card-meta { color:var(--muted); font-size:10px; letter-spacing:1px; margin-bottom:10px; }
+  .game-card-stats { display:flex; gap:12px; font-size:10px; }
+  .game-card-del { position:absolute; top:10px; right:10px; background:none; border:none; color:var(--border); cursor:pointer; font-size:15px; transition:color .15s; }
+  .game-card-del:hover { color:var(--danger); }
+
+  .footer-bar { display:flex; gap:12px; padding:14px 28px; border-top:1px solid var(--border); }
+  .footer-note { color:var(--muted); font-size:10px; letter-spacing:1px; align-self:center; }
+
+  ::-webkit-scrollbar{width:4px;height:4px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:var(--border)} ::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+
+  ::selection { background-color: #000; color: var(--text); }
+  ::-moz-selection { background-color: #000; color: var(--text); }
+
+  @media(max-width:768px){
+    header,.home-hero,.game-bar,.table-section,.ai-panel,.footer-bar,.breadcrumb,.team-view-header{padding-left:16px;padding-right:16px}
+    .stats-strip{grid-template-columns:repeat(3,1fr)}
+    .stat-box:nth-child(4),.stat-box:nth-child(5),.stat-box:nth-child(6){display:none}
+  }
+
+  /* Fix option colors in dark theme */
+  select option { background:var(--surface); color:var(--text); }
+
+  /* Filter row */
+  .filter-row th { padding:2px 3px; background:rgba(200,241,53,.04); }
+  .filter-row select, .filter-row input { background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:10px; padding:3px 5px; width:100%; outline:none; cursor:pointer; }
+  .filter-row select:focus, .filter-row input:focus { border-color:var(--accent); }
+  .filter-row input::placeholder { color:var(--muted); }
+
+  /* AI type selection bar */
+  .ai-type-bar { display:flex; gap:6px; align-items:center; padding:10px 28px; border-bottom:1px solid var(--border); flex-wrap:wrap; background:var(--surface); }
+  .ai-type-label { color:var(--muted); font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-right:4px; white-space:nowrap; }
+  .ai-type-btn { border:1px solid var(--border); background:transparent; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1px; padding:5px 10px; cursor:pointer; transition:all .15s; text-transform:uppercase; }
+  .ai-type-btn.active { border-color:var(--accent2); background:rgba(255,77,0,.15); color:var(--accent2); }
+  .ai-type-btn:hover:not(.active) { border-color:var(--text); color:var(--text); }
+
+  /* ── AI OUTPUT MODE TOGGLE ── */
+  .ai-output-toggle { display:flex; gap:0; margin-left:auto; }
+  .ai-output-btn { border:1px solid var(--border); background:transparent; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1px; padding:5px 12px; cursor:pointer; transition:all .15s; }
+  .ai-output-btn:first-child { border-right:none; }
+  .ai-output-btn.active { border-color:var(--accent); background:rgba(200,241,53,.12); color:var(--accent); }
+  .ai-output-btn:hover:not(.active) { border-color:var(--text); color:var(--text); }
+
+  /* ── AI INTERACTIVE DASHBOARD ── */
+  .ai-dash { display:flex; flex-direction:column; gap:16px; }
+  .ai-dash-header { display:flex; justify-content:space-between; align-items:center; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  .ai-dash-title { font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:2px; color:var(--accent); }
+  .ai-dash-meta { color:var(--muted); font-size:10px; letter-spacing:1px; }
+  .ai-dash-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .ai-dash-card { background:var(--bg); border:1px solid var(--border); padding:14px; display:flex; flex-direction:column; gap:8px; }
+  .ai-dash-card-title { color:var(--accent2); font-size:10px; letter-spacing:2px; text-transform:uppercase; font-weight:700; }
+  .ai-dash-bar-group { display:flex; flex-direction:column; gap:5px; }
+  .ai-dash-bar-row { display:flex; align-items:center; gap:8px; font-size:11px; }
+  .ai-dash-bar-label { color:var(--muted); min-width:90px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ai-dash-bar-track { flex:1; height:18px; background:rgba(255,255,255,.04); position:relative; overflow:hidden; }
+  .ai-dash-bar-fill { height:100%; transition:width .6s ease; position:absolute; left:0; top:0; }
+  .ai-dash-bar-val { color:var(--text); font-size:10px; min-width:36px; text-align:right; letter-spacing:.5px; }
+  .ai-dash-kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .ai-dash-kpi { text-align:center; padding:10px 6px; background:rgba(200,241,53,.04); border:1px solid var(--border); }
+  .ai-dash-kpi-value { font-family:'Bebas Neue',sans-serif; font-size:24px; color:var(--accent); line-height:1; }
+  .ai-dash-kpi-label { color:var(--muted); font-size:9px; letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
+  .ai-dash-insight { background:rgba(255,77,0,.05); border:1px solid rgba(255,77,0,.2); padding:12px 14px; }
+  .ai-dash-insight-title { color:var(--accent2); font-size:10px; letter-spacing:2px; text-transform:uppercase; font-weight:700; margin-bottom:6px; }
+  .ai-dash-insight-text { color:#ccc; font-size:11px; line-height:1.7; letter-spacing:.3px; }
+  .ai-dash-donut-wrap { display:flex; align-items:center; gap:14px; }
+  .ai-dash-donut-legend { display:flex; flex-direction:column; gap:3px; flex:1; }
+  .ai-dash-donut-item { display:flex; align-items:center; gap:6px; font-size:10px; color:var(--muted); }
+  .ai-dash-donut-swatch { width:10px; height:10px; flex-shrink:0; }
+  @media(max-width:768px) {
+    .ai-dash-grid { grid-template-columns:1fr; }
+    .ai-dash-kpi-grid { grid-template-columns:repeat(2,1fr); }
+    .ai-output-toggle { margin-left:0; margin-top:4px; }
+  }
+
+  /* CUSTOM AI QUERY */
+  .ai-custom-bar { display:none; align-items:center; gap:10px; padding:10px 28px 12px; background:var(--surface); border-bottom:1px solid var(--border); }
+  .ai-custom-bar.visible { display:flex; }
+  .ai-custom-input { flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:8px 12px; outline:none; transition:border-color .15s; }
+  .ai-custom-input:focus { border-color:var(--accent2); }
+  .ai-custom-input::placeholder { color:var(--muted); }
+
+  /* LOGIN SCREEN */
+  #loginScreen { display:none; position:fixed; inset:0; background:var(--bg); z-index:1000; align-items:center; justify-content:center; flex-direction:column; gap:0; }
+  #loginScreen.active { display:flex; }
+  .login-box { background:var(--surface); border:1px solid var(--border); padding:40px 36px; width:400px; max-width:94vw; }
+  .login-logo { font-family:'Bebas Neue',sans-serif; font-size:30px; letter-spacing:5px; color:var(--accent); margin-bottom:6px; }
+  .login-sub { color:var(--muted); font-size:10px; letter-spacing:2px; margin-bottom:28px; }
+  .login-label { color:var(--muted); font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-bottom:6px; margin-top:14px; display:block; }
+  .login-input { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:9px 11px; outline:none; }
+  .login-input:focus { border-color:var(--accent); }
+  .login-error { color:var(--danger); font-size:10px; letter-spacing:1px; margin-top:10px; min-height:16px; }
+  .login-divider { display:flex; align-items:center; gap:12px; margin:18px 0; }
+  .login-divider::before,.login-divider::after { content:''; flex:1; border-top:1px solid var(--border); }
+  .login-divider span { color:var(--muted); font-size:10px; letter-spacing:2px; }
+  .btn-google { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:1px; padding:9px; cursor:pointer; transition:all .15s; }
+  .btn-google:hover { border-color:#4285F4; color:#4285F4; }
+  .login-toggle { color:var(--muted); font-size:10px; letter-spacing:1px; margin-top:16px; text-align:center; }
+  .login-toggle span { color:var(--accent); cursor:pointer; }
+  .login-toggle span:hover { text-decoration:underline; }
+
+  /* USER BADGE in header */
+  .user-badge { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10px; letter-spacing:1px; }
+  .user-avatar { width:26px; height:26px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--accent); font-family:'Bebas Neue',sans-serif; overflow:hidden; }
+  .user-avatar img { width:100%; height:100%; object-fit:cover; }
+
+  /* PENDING SCREEN */
+  #pendingScreen { display:none; position:fixed; inset:0; background:var(--bg); z-index:1000; align-items:center; justify-content:center; flex-direction:column; }
+  #pendingScreen.active { display:flex; }
+  .pending-box { background:var(--surface); border:1px solid var(--border); padding:44px 40px; width:440px; max-width:94vw; text-align:center; }
+  .pending-icon { font-size:36px; margin-bottom:18px; }
+  .pending-title { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:4px; color:var(--accent); margin-bottom:10px; }
+  .pending-msg { color:var(--muted); font-size:11px; letter-spacing:1px; line-height:1.8; }
+  .pending-email { color:var(--text); font-size:11px; margin-top:10px; border:1px solid var(--border); padding:8px 14px; background:var(--bg); letter-spacing:1px; }
+
+  /* SHARE MODAL */
+  .share-members { margin-top:12px; display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto; }
+  .share-member-row { display:flex; align-items:center; gap:8px; padding:7px 10px; background:var(--bg); border:1px solid var(--border); font-size:11px; }
+  .share-member-email { flex:1; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .share-member-role { color:var(--muted); font-size:10px; letter-spacing:1px; }
+  .share-member-del { background:none; border:none; color:var(--muted); cursor:pointer; font-size:15px; padding:0 4px; transition:color .15s; }
+  .share-member-del:hover { color:var(--danger); }
+
+  /* SHARED SECTION on home */
+  .shared-section { padding:22px 28px 0; border-top:1px solid var(--border); }
+  .shared-section-title { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:4px; color:var(--muted); margin-bottom:14px; }
+  .team-card-shared-badge { position:absolute; top:12px; left:12px; background:rgba(200,241,53,.12); border:1px solid var(--accent); color:var(--accent); font-size:9px; letter-spacing:2px; padding:2px 7px; text-transform:uppercase; }
+  .team-card-role-badge { position:absolute; bottom:12px; right:12px; font-size:9px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; }
+
+  /* ADMIN PANEL */
+  #adminModal .modal-box { width:600px; max-width:96vw; max-height:80vh; display:flex; flex-direction:column; }
+  .admin-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:16px; }
+  .admin-tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted); font-size:11px; letter-spacing:2px; padding:8px 18px; cursor:pointer; text-transform:uppercase; transition:all .15s; }
+  .admin-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .admin-users-list { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .admin-user-row { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--bg); border:1px solid var(--border); font-size:11px; flex-wrap:wrap; }
+  .admin-user-meta-dates { display:flex; flex-direction:column; gap:1px; margin-left:auto; text-align:right; }
+  .admin-user-meta-date { color:var(--muted); font-size:9px; letter-spacing:1px; white-space:nowrap; }
+  .admin-user-email { flex:1; color:var(--text); }
+  .admin-user-role { font-size:9px; letter-spacing:2px; text-transform:uppercase; padding:2px 8px; border:1px solid; }
+  .admin-user-role.admin { color:#f88; border-color:#f55; background:rgba(255,80,80,.1); }
+  .admin-user-role.user { color:var(--muted); border-color:var(--border); }
+  .admin-user-status { font-size:9px; letter-spacing:2px; text-transform:uppercase; }
+  .admin-user-status.pending { color:#f8c; }
+  .admin-user-status.approved { color:var(--accent); }
+  /* ADMIN CONTENT TAB */
+  .admin-content-user { border:1px solid var(--border); margin-bottom:8px; background:var(--bg); }
+  .admin-content-user-header { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; transition:background .15s; }
+  .admin-content-user-header:hover { background:var(--surface2); }
+  .admin-content-user-email { flex:1; font-size:11px; color:var(--text); }
+  .admin-content-user-meta { font-size:10px; color:var(--muted); letter-spacing:1px; }
+  .admin-content-chevron { color:var(--muted); font-size:12px; transition:transform .2s; }
+  .admin-content-chevron.open { transform:rotate(90deg); }
+  .admin-content-teams { display:none; padding:0 14px 12px; border-top:1px solid var(--border); }
+  .admin-content-teams.open { display:block; }
+  .admin-team-row { padding:8px 10px; border:1px solid var(--border); margin-top:8px; background:var(--surface); }
+  .admin-team-name { font-family:'Bebas Neue',sans-serif; font-size:14px; letter-spacing:2px; color:var(--accent); margin-bottom:2px; }
+  .admin-team-meta { font-size:10px; color:var(--muted); letter-spacing:1px; }
+  .admin-game-pill { display:inline-block; border:1px solid var(--border); padding:2px 8px; font-size:10px; color:var(--muted); margin:4px 4px 0 0; letter-spacing:1px; }
+
+  /* ADMIN IMPERSONATION BAR */
+  #adminImpersonateBar { display:none; position:fixed; bottom:0; left:0; right:0; z-index:400; background:#140800; border-top:2px solid var(--accent2); padding:10px 28px; align-items:center; gap:14px; }
+  #adminImpersonateBar.visible { display:flex; }
+  .impersonate-label { color:var(--accent2); font-size:9px; letter-spacing:3px; text-transform:uppercase; white-space:nowrap; }
+  .impersonate-email { color:var(--text); font-size:12px; letter-spacing:1px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* MODALITY SELECTION VIEW */
+  .modality-card { max-width:480px; margin:80px auto; padding:48px 40px; border:1px solid var(--border); background:var(--surface); text-align:center; }
+  .modality-title { font-family:'Bebas Neue',sans-serif; font-size:36px; letter-spacing:5px; color:var(--accent); margin-bottom:8px; }
+  .modality-sub { color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:28px; line-height:1.8; }
+  .modality-game-info { color:var(--muted); font-size:11px; letter-spacing:1px; margin-bottom:28px; border:1px solid var(--border); padding:10px 16px; background:var(--bg); }
+  .modality-select { width:100%; max-width:280px; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; padding:11px 14px; outline:none; cursor:pointer; letter-spacing:2px; margin-bottom:8px; }
+  .modality-select:focus { border-color:var(--accent); }
+  .modality-error { color:var(--danger); font-size:11px; letter-spacing:1px; min-height:18px; margin-bottom:12px; }
+  .modality-badge { display:inline-flex; align-items:center; border:1px solid var(--accent); padding:3px 12px; font-size:10px; letter-spacing:2px; color:var(--accent); cursor:pointer; transition:all .15s; gap:4px; }
+  .modality-badge:hover { background:rgba(200,241,53,.1); }
+
+  /* BUG REPORT */
+  .bug-textarea { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:10px; outline:none; resize:vertical; line-height:1.6; margin-top:6px; }
+  .bug-textarea:focus { border-color:var(--accent); }
+  .bug-success { color:var(--accent); font-size:11px; letter-spacing:1px; margin-top:8px; }
+
+  /* ── TOAST ── */
+  #toastContainer{position:fixed;bottom:24px;right:24px;z-index:9000;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px;}
+  .toast{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);color:var(--text);font-size:11px;letter-spacing:.5px;padding:11px 16px;pointer-events:auto;animation:toastIn .2s ease;display:flex;align-items:center;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,.5);}
+  .toast.error{border-left-color:var(--danger);}
+  .toast.warning{border-left-color:#f90;}
+  .toast.info{border-left-color:#4d88ff;}
+  .toast-msg{flex:1;line-height:1.5;}
+  .toast-undo{color:var(--accent2);cursor:pointer;font-size:10px;white-space:nowrap;text-decoration:underline;background:none;border:none;padding:0;font-family:inherit;letter-spacing:1px;}
+  .toast-close{color:var(--muted);cursor:pointer;background:none;border:none;font-size:14px;line-height:1;padding:0;flex-shrink:0;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+
+  /* ── LOADING OVERLAY ── */
+  #loadingOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:800;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+  #loadingOverlay.visible{display:flex;}
+  .loading-text{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:4px;color:var(--accent);}
+
+  /* ── CUSTOM CONFIRM MODAL ── */
+  .confirm-msg{color:var(--text);font-size:12px;line-height:1.9;letter-spacing:.5px;margin-bottom:22px;}
+
+  /* ── GLOBAL SEARCH ── */
+  #searchModal{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:700;display:none;flex-direction:column;align-items:center;padding-top:80px;padding-bottom:40px;}
+  #searchModal.open{display:flex;}
+  .search-box{width:100%;max-width:660px;padding:0 20px;}
+  .search-input-wrap{position:relative;}
+  .search-input{width:100%;background:var(--surface);border:1px solid var(--border);border-bottom:2px solid var(--accent);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:15px;padding:14px 16px 14px 44px;outline:none;letter-spacing:1px;}
+  .search-icon-lbl{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:16px;pointer-events:none;}
+  .search-results{margin-top:12px;max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:1px;}
+  .search-result{background:var(--surface);padding:11px 16px;cursor:pointer;transition:background .12s;border-left:3px solid transparent;}
+  .search-result:hover{background:var(--surface2);border-left-color:var(--accent);}
+  .search-result-title{color:var(--text);font-size:12px;letter-spacing:.5px;}
+  .search-result-meta{color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:3px;}
+  .search-result-match{color:var(--accent);font-size:10px;letter-spacing:1px;margin-top:2px;}
+  .search-empty{color:var(--muted);font-size:11px;letter-spacing:1px;padding:20px;text-align:center;}
+  .search-hint{color:var(--muted);font-size:10px;letter-spacing:2px;text-align:center;margin-top:20px;}
+
+  /* ── CHARTS ── */
+  .charts-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);}
+  .chart-box{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:130px;justify-content:flex-start;}
+  .chart-title{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;align-self:flex-start;}
+  .chart-legend{display:flex;flex-direction:column;gap:3px;width:100%;}
+  .chart-legend-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted);}
+  .chart-swatch{width:8px;height:8px;flex-shrink:0;}
+  .chart-no-data{color:var(--muted);font-size:10px;letter-spacing:1px;padding:16px 0;}
+
+  /* ── SCORE ── */
+  .score-group{display:flex;align-items:center;gap:5px;}
+  .score-input{width:52px!important;text-align:center;}
+  .score-sep{color:var(--muted);font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;}
+
+  /* ── NOTES ── */
+  .notes-section{padding:14px 28px 20px;border-top:1px solid var(--border);}
+  .notes-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;user-select:none;}
+  .notes-label{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+  .notes-toggle-btn{color:var(--muted);font-size:10px;letter-spacing:1px;background:none;border:none;cursor:pointer;transition:color .15s;padding:0;font-family:inherit;}
+  .notes-toggle-btn:hover{color:var(--accent);}
+  .notes-textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:10px;outline:none;resize:vertical;line-height:1.7;min-height:80px;}
+  .notes-textarea:focus{border-color:var(--accent);}
+
+  /* ── TEAM DASHBOARD ── */
+  .team-dashboard{padding:14px 28px;border-bottom:1px solid var(--border);background:var(--surface2);}
+  .team-dashboard-title{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+  .team-dashboard-stats{display:flex;gap:22px;flex-wrap:wrap;}
+  .tdstat{display:flex;flex-direction:column;gap:1px;}
+  .tdstat-value{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);line-height:1;}
+  .tdstat-label{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+
+  /* ── SORT ── */
+  th.sortable{cursor:pointer;user-select:none;transition:color .12s;}
+  th.sortable:hover{color:var(--accent);}
+  th.sort-asc::after{content:' ▲';color:var(--accent);font-size:7px;}
+  th.sort-desc::after{content:' ▼';color:var(--accent);font-size:7px;}
+
+  /* ── DUPLICATE BUTTON ── */
+  .dup-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:3px 4px;transition:color .15s;line-height:1;}
+  .dup-btn:hover{color:var(--accent);}
+
+  /* ── AI HISTORY ── */
+  .ai-history-section{padding:12px 18px;border-top:1px solid rgba(255,77,0,.2);background:rgba(0,0,0,.15);}
+  .ai-history-title{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+  .ai-history-list{display:flex;flex-direction:column;gap:4px;}
+  .ai-history-item{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);cursor:pointer;transition:background .12s;font-size:11px;}
+  .ai-history-item:hover{background:var(--surface2);border-color:var(--accent2);}
+  .ai-history-label{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ai-history-date{color:var(--muted);font-size:10px;letter-spacing:1px;white-space:nowrap;}
+
+  /* ── SAVE INDICATOR ── */
+  #saveIndicator{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:600;background:var(--surface);border:1px solid var(--border);padding:5px 14px;font-size:10px;letter-spacing:1px;color:var(--muted);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+  #saveIndicator.saving{border-color:#f90;color:#f90;opacity:1;}
+  #saveIndicator.saved{border-color:var(--accent);color:var(--accent);opacity:1;}
+
+  /* ── FILTER BADGE ── */
+  #filterClearBtn{position:relative;}
+  .filter-badge{position:absolute;top:-5px;right:-5px;background:var(--accent2);color:#fff;font-size:8px;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;pointer-events:none;}
+
+  /* ── PLAY FLAG / STAR ── */
+  .flag-btn{background:none;border:none;color:#ffc107;cursor:pointer;font-size:14px;padding:3px 4px;line-height:1;opacity:.35;transition:opacity .15s,color .15s,transform .1s;}
+  .flag-btn:hover{opacity:.8;}
+  .flag-btn.flagged{opacity:1;color:var(--accent);transform:scale(1.15);}
+  tbody tr.flagged-row{background:rgba(200,241,53,.055)!important;}
+  tbody tr.flagged-row:hover{background:rgba(200,241,53,.1)!important;}
+
+  /* ── COMPARE MODAL ── */
+  .compare-header{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .compare-sel{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:7px 10px;outline:none;cursor:pointer;min-width:160px;}
+  .compare-sel:focus{border-color:var(--accent);}
+  .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);}
+  .compare-col{background:var(--surface);padding:14px 16px;}
+  .compare-col-title{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;color:var(--accent);margin-bottom:10px;}
+  .compare-stat-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;}
+  .compare-stat-label{color:var(--muted);}
+  .compare-stat-val{color:var(--text);}
+  .compare-stat-val.better{color:var(--accent);}
+  .compare-empty{color:var(--muted);font-size:11px;padding:16px;text-align:center;letter-spacing:1px;}
+
+  /* ── SORT GAMES BAR ── */
+  .games-sort-bar{display:flex;gap:8px;align-items:center;padding:10px 28px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .games-sort-label{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+  .games-sort-btn{border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;padding:4px 10px;cursor:pointer;transition:all .15s;}
+  .games-sort-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(200,241,53,.07);}
+
+  /* ── PAGINATION ── */
+  .pagination-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 0;border-top:1px solid var(--border);}
+  .page-btn{border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 10px;cursor:pointer;transition:all .15s;}
+  .page-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .page-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(200,241,53,.1);}
+  .page-info{color:var(--muted);font-size:10px;letter-spacing:1px;}
+
+  /* ── IMPORT MODAL ── */
+  .import-dropzone{border:2px dashed var(--border);padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-top:12px;}
+  .import-dropzone:hover,.import-dropzone.drag-over{border-color:var(--accent);background:rgba(200,241,53,.04);}
+  .import-dropzone-label{color:var(--muted);font-size:11px;letter-spacing:1px;}
+  .import-dropzone-sub{color:var(--border);font-size:10px;letter-spacing:1px;margin-top:6px;}
+
+  /* ── ADMIN SEARCH / FILTER ── */
+  .admin-search-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .admin-search-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:7px 10px;outline:none;min-width:140px;}
+  .admin-search-input:focus{border-color:var(--accent);}
+  .admin-filter-btn{border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;padding:5px 10px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+  .admin-filter-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(200,241,53,.07);}
+
+  /* ── ADMIN PENDING BADGE ── */
+  .admin-pending-badge{background:var(--accent2);color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle;display:none;}
+
+  /* ── PRINT STYLES ── */
+  @media print{
+    body{background:#fff!important;color:#000!important;}
+    header,#toastContainer,#loadingOverlay,#searchModal,#modalConfirm,.modal-overlay,.ai-panel,.footer-bar,.ai-type-bar,.ai-custom-bar,.game-bar .btn,.breadcrumb .bc-link,.btn-danger,.btn-ai,.btn-primary,#btnExport,#btnAnalyze,#btnSearch,#btnImport,.del-btn,.dup-btn,.flag-btn,.add-row-btn,.pagination-bar,.charts-strip,.notes-section,#adminImpersonateBar,.games-sort-bar{display:none!important;}
+    .view{display:block!important;}
+    .view:not(.active){display:none!important;}
+    table{min-width:unset!important;font-size:9pt;}
+    th{font-size:8pt;background:#f0f0f0!important;color:#000!important;border:1px solid #ccc!important;}
+    td{border:1px solid #ddd!important;color:#000!important;padding:3px 5px!important;}
+    td input,td select{border:none!important;background:transparent!important;color:#000!important;font-size:9pt;}
+    .stats-strip{background:#f5f5f5!important;}
+    .stat-label{color:#555!important;}
+    .stat-value{color:#000!important;font-size:18pt!important;}
+    .game-bar{background:#f0f0f0!important;border:1px solid #ccc!important;color:#000!important;}
+    .game-bar label{color:#555!important;}
+    .game-bar input,.game-bar select{color:#000!important;border:1px solid #ccc!important;background:#fff!important;}
+    .breadcrumb{color:#000!important;}
+    .bc-current,.bc-link{color:#000!important;}
+    @page{margin:1cm 1.5cm;}
+  }
+
+  /* ── MOBILE OVERHAUL ── */
+  @media(max-width:768px){
+    header{padding:10px 14px;}
+    .logo span{display:none;}
+    #btnExport{display:none!important;}
+    .home-hero,.table-section,.footer-bar,.breadcrumb,.team-view-header,.notes-section,.team-dashboard{padding-left:14px;padding-right:14px;}
+    .game-bar{padding:10px 14px;gap:6px;}
+    .ai-type-bar{padding:8px 14px;}
+    .ai-panel{margin:0 14px 14px;}
+    .stats-strip{grid-template-columns:repeat(3,1fr);}
+    .stat-box:nth-child(4),.stat-box:nth-child(5),.stat-box:nth-child(6){display:none;}
+    .charts-strip{grid-template-columns:1fr 1fr;}
+    .chart-box:last-child{display:none;}
+    .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    table{min-width:760px;}
+    td{padding:2px;}
+    th{font-size:8px;padding:8px 4px;}
+    td input,td select{font-size:11px;padding:3px 4px;}
+    .game-bar input[type=url]{width:120px;}
+    .game-bar input[type=date]{width:130px;}
+    .score-group{display:none;}
+    .search-box{padding:0 14px;}
+    .modality-card{margin:30px 14px;padding:28px 20px;}
+    .teams-grid,.games-grid{grid-template-columns:1fr;}
+    .header-right{gap:6px;}
+    #btnAnalyze{font-size:10px;padding:5px 8px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- SAVE INDICATOR -->
+<div id="saveIndicator">&#x2022; Salvando...</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toastContainer"></div>
+
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay">
+  <div class="loading-text">Carregando...</div>
+  <div style="display:flex;gap:6px">
+    <div class="dot"></div><div class="dot" style="animation-delay:.2s"></div><div class="dot" style="animation-delay:.4s"></div>
+  </div>
+</div>
+
+<!-- SEARCH MODAL -->
+<div id="searchModal">
+  <div class="search-box">
+    <div class="search-input-wrap">
+      <span class="search-icon-lbl">🔍</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="Buscar times, jogos, formações, coberturas..."
+        oninput="runSearch(this.value)" onkeydown="handleSearchKey(event)" autocomplete="off">
+    </div>
+    <div class="search-results" id="searchResults"></div>
+    <div class="search-hint" id="searchHint">ESC para fechar · Enter para abrir o primeiro resultado</div>
+  </div>
+</div>
+
+<!-- CUSTOM CONFIRM MODAL -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-title" style="font-size:16px">Confirmar</div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="_cancelConfirm()">Cancelar</button>
+      <button class="btn btn-danger" id="confirmOkBtn" onclick="_doConfirm()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- PENDING APPROVAL SCREEN -->
+<div id="pendingScreen">
+  <div class="pending-box">
+    <div class="pending-icon">⏳</div>
+    <div class="pending-title">Acesso Pendente</div>
+    <div class="pending-msg">
+      Sua conta foi criada com sucesso.<br>
+      Um <b style="color:var(--text)">email de confirmação</b> foi enviado para o endereço abaixo.<br><br>
+      Após verificar seu email, aguarde a <b style="color:var(--text)">aprovação do administrador</b>.<br>
+      Você será liberado assim que o admin aprovar sua conta.
+    </div>
+    <div class="pending-email" id="pendingEmail"></div>
+    <div style="margin-top:24px;display:flex;gap:10px;justify-content:center">
+      <button class="btn btn-sm" onclick="_firebaseAuth && _firebaseAuth.currentUser && _firebaseAuth.currentUser.reload().then(() => checkApproval(_firebaseAuth.currentUser))">Verificar aprovação</button>
+      <button class="btn btn-sm btn-danger" onclick="logoutUser()">Sair</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="active">
+  <div class="login-box">
+    <div class="login-logo">P.A.N.D.A.</div>
+    <div class="login-sub">// Programa de Análise e Neutralização de Decisões Adversárias</div>
+    <div id="loginTitle" style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:3px;color:var(--muted);margin-bottom:20px">ENTRAR</div>
+    <div id="authNameRow" style="display:none">
+      <label class="login-label">Nome</label>
+      <input class="login-input" type="text" id="authName" placeholder="Seu nome">
+    </div>
+    <label class="login-label">Email</label>
+    <input class="login-input" type="email" id="authEmail" placeholder="seu@email.com" autocomplete="email">
+    <label class="login-label">Senha</label>
+    <input class="login-input" type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()">
+    <div id="authConfirmRow" style="display:none">
+      <label class="login-label">Confirmar Senha</label>
+      <input class="login-input" type="password" id="authConfirmPassword" placeholder="••••••••" oninput="checkPasswordMatch()">
+      <div id="authPasswordMatch" style="font-size:10px;letter-spacing:1px;margin-top:5px;min-height:14px"></div>
+    </div>
+    <div class="login-error" id="authError"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="submitAuth()">Entrar</button>
+    <div class="login-divider"><span>ou</span></div>
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continuar com Google
+    </button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:8px">
+      <div class="login-toggle" id="loginToggle" style="margin-top:0">Não tem conta? <span onclick="toggleAuthMode()">Criar conta</span></div>
+      <span id="btnForgotPassword" style="color:var(--muted);font-size:10px;letter-spacing:1px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'" onclick="sendForgotPassword()">Esqueci minha senha</span>
+    </div>
+  </div>
+</div>
+
+<header id="appHeader" style="display:none">
+  <div class="logo">P.A.N.D.A. <span>// Programa de Análise e Neutralização de Decisões Adversárias</span></div>
+  <div class="header-right" id="headerRight">
+    <button class="btn btn-sm" id="btnConfig" onclick="openConfigModal()" title="Configurar chave de API Groq" style="display:none">⚙ Config</button>
+    <button class="btn btn-sm" id="btnSearch" onclick="openSearch()" title="Busca global (Ctrl+K)" style="display:none">🔍 Buscar</button>
+    <button class="btn btn-sm" id="btnViewAI" onclick="viewLastAI()" style="display:none" title="Ver última análise IA">📄 Ver Análise</button>
+    <button class="btn btn-sm" id="btnPrint" onclick="printScout()" style="display:none" title="Imprimir scout">🖨 Imprimir</button>
+    <button class="btn btn-sm" id="btnImport" onclick="openImportModal()" style="display:none" title="Importar dados">↑ Importar</button>
+    <button class="btn btn-ai" id="btnAnalyze" onclick="analyzeWithAI()" style="display:none">⬇ Baixar Análise IA</button>
+    <button class="btn btn-primary" id="btnExport" onclick="exportCSV()" style="display:none">Exportar CSV</button>
+    <div class="user-badge" id="userBadge" style="display:none">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <span id="userEmail" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <span id="adminBadge" style="display:none;background:rgba(255,80,80,.18);border:1px solid #f55;color:#f88;font-size:9px;letter-spacing:2px;padding:2px 8px;text-transform:uppercase">ADMIN</span>
+      <button class="btn btn-sm" id="btnAdminPanel" style="display:none" onclick="openAdminPanel()">&#x2699; Painel Admin<span class="admin-pending-badge" id="adminPendingBadge"></span></button>
+      <button class="btn btn-sm" id="btnBugReport" style="display:none" onclick="openBugReportModal()">🐛 Reportar Bug</button>
+      <button class="btn btn-sm btn-danger" onclick="logoutUser()">Sair</button>
+    </div>
+  </div>
+</header>
+
+<!-- VIEW: HOME -->
+<div class="view" id="view-home">
+  <div class="home-hero">
+    <div class="home-title">Times Adversários</div>
+    <button class="btn btn-primary" onclick="openNewTeamModal()">+ Novo Time</button>
+  </div>
+  <div id="teamsContainer"></div>
+  <div id="sharedSection" style="display:none">
+    <div class="shared-section">
+      <div class="shared-section-title">Times Compartilhados Comigo</div>
+    </div>
+    <div id="sharedTeamsContainer"></div>
+  </div>
+</div>
+
+<!-- VIEW: TEAM -->
+<div class="view" id="view-team">
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="goHome()">Times</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current" id="bc-team-name">—</span>
+  </div>
+  <div class="team-view-header">
+    <div>
+      <div id="tvName" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--accent)"></div>
+      <div id="tvMeta" style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:4px"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" id="btnShareTeam" onclick="openShareModal()" style="display:none">👤 Compartilhar</button>
+      <button class="btn btn-primary" id="btnNewGame" onclick="openNewGameModal()">+ Novo Jogo</button>
+      <button class="btn btn-danger" id="btnDeleteTeam" onclick="deleteCurrentTeam()">Excluir Time</button>
+    </div>
+  </div>
+  <div id="teamDashboard" class="team-dashboard" style="display:none"></div>
+  <div class="games-sort-bar">
+    <span class="games-sort-label">Ordenar:</span>
+    <button class="games-sort-btn active" id="gSortDate" onclick="setGamesSort('date')">Por Data</button>
+    <button class="games-sort-btn" id="gSortName" onclick="setGamesSort('name')">Por Nome</button>
+    <button class="games-sort-btn" id="gSortPhase" onclick="setGamesSort('phase')">Por Fase</button>
+    <button class="games-sort-btn" id="gSortPlays" onclick="setGamesSort('plays')">Por Jogadas</button>
+    <button class="btn btn-sm" style="margin-left:auto;border-color:var(--accent2);color:var(--accent2)" onclick="openCompareModal()">&#x2A75; Comparar Jogos</button>
+  </div>
+  <div id="gamesContainer"></div>
+</div>
+
+<!-- VIEW: MODALITY SELECTION -->
+<div class="view" id="view-modality">
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="goHome()">Times</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-link" id="bc-mod-team" onclick="goTeam()">—</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-link" id="bc-mod-game">—</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Modalidade</span>
+  </div>
+  <div class="modality-card">
+    <div class="modality-title">Modalidade</div>
+    <div class="modality-sub">Informe a modalidade praticada neste jogo<br>para um scout mais preciso</div>
+    <div class="modality-game-info">
+      <span id="modTeamName" style="color:var(--accent)">—</span>
+      <span style="color:var(--muted)"> · </span>
+      <span id="modGameTitle" style="color:var(--text)">—</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <select class="modality-select" id="modalitySelect">
+        <option value="">— Selecione a modalidade —</option>
+        <option value="5x5">5x5</option>
+        <option value="8x8">8x8</option>
+        <option value="9x9">9x9</option>
+        <option value="Full Pad">Full Pad</option>
+      </select>
+      <div class="modality-error" id="modError"></div>
+      <button class="btn btn-primary" style="min-width:220px;padding:10px 20px;font-size:12px" onclick="confirmModality()">Continuar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW: SCOUT -->
+<div class="view" id="view-scout">
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="goHome()">Times</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-link" id="bc-scout-team" onclick="goTeam()">—</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current" id="bc-scout-game">—</span>
+  </div>
+
+  <div class="game-bar">
+    <span id="gameModalityBadge" class="modality-badge" style="display:none" onclick="changeModality()" title="Clique para alterar modalidade">🏈 <span id="gameModalityText"></span></span>
+    <label>Fase</label>
+    <select id="gamePhase" onchange="saveGame()">
+      <option value="">—</option>
+      <option>Fase de grupos</option><option>Quartas</option>
+      <option>Semi</option><option>Final</option><option>Amistoso</option>
+    </select>
+    <label>Data</label>
+    <input type="date" id="gameDate" oninput="saveGame()">
+    <label>Link do Tape</label>
+    <input type="url" id="gameLink" placeholder="https://youtube.com/..." style="width:200px" oninput="saveGame();toggleLinkBtn()">
+    <button class="btn btn-sm" id="openLinkBtn" onclick="openGameLink()" style="display:none">▶ Abrir</button>
+    <label>Placar</label>
+    <div class="score-group">
+      <input type="number" id="scoreUs" class="score-input" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px;outline:none;transition:border-color .15s" placeholder="Nós" min="0" oninput="saveGame()">
+      <span class="score-sep">×</span>
+      <input type="number" id="scoreThem" class="score-input" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px;outline:none;transition:border-color .15s" placeholder="Eles" min="0" oninput="saveGame()">
+    </div>
+    <button class="btn btn-sm btn-danger" onclick="deleteCurrentGame()" style="margin-left:auto">Excluir Jogo</button>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat-box"><div class="stat-label">Total Jogadas</div><div class="stat-value" id="statTotal">0</div></div>
+    <div class="stat-box"><div class="stat-label">Passes</div><div class="stat-value" id="statPass" style="color:#ff4d00">0</div></div>
+    <div class="stat-box"><div class="stat-label">Corridas</div><div class="stat-value" id="statRun" style="color:#4d88ff">0</div></div>
+    <div class="stat-box"><div class="stat-label">Conversões</div><div class="stat-value" id="statConv" style="color:var(--accent)">0</div></div>
+    <div class="stat-box"><div class="stat-label">Turnovers</div><div class="stat-value" id="statTurn" style="color:#ff3333">0</div></div>
+    <div class="stat-box"><div class="stat-label">Méd. Metros</div><div class="stat-value" id="statAvgYards" style="color:#4d88ff;font-size:20px">0.0</div></div>
+  </div>
+
+  <div class="ai-type-bar">
+    <span class="ai-type-label">Foco da análise:</span>
+    <button class="ai-type-btn active" onclick="setAnalysisType(this,'terceiro_down')">3º Down</button>
+    <button class="ai-type-btn" onclick="setAnalysisType(this,'posicao_final')">Pos. Final da Bola</button>
+    <button class="ai-type-btn" onclick="setAnalysisType(this,'tendencias_ataque')">Tendências Ataque</button>
+    <button class="ai-type-btn" onclick="setAnalysisType(this,'red_zone')">Red Zone</button>
+    <button class="ai-type-btn" onclick="setAnalysisType(this,'tendencias_defesa')">Tendências Defesa</button>
+    <button class="ai-type-btn" onclick="setAnalysisType(this,'custom')">💬 Consulta Livre</button>
+    <div class="ai-output-toggle">
+      <button class="ai-output-btn active" id="btnModeDoc" onclick="setOutputMode('doc')">📄 Doc</button>
+      <button class="ai-output-btn" id="btnModeCharts" onclick="setOutputMode('charts')">📊 Gráficos</button>
+    </div>
+  </div>
+
+  <div class="ai-custom-bar" id="aiCustomBar">
+    <input class="ai-custom-input" id="aiCustomQuestion" type="text"
+      placeholder="Ex: Quais são os padrões de formação ofensiva no 2º down longo?"
+      onkeydown="if(event.key==='Enter') analyzeWithAI()"
+      oninput="document.getElementById('aiCustomCount').textContent=this.value.length+'/300'"
+      maxlength="300">
+    <span style="color:var(--muted);font-size:10px;white-space:nowrap" id="aiCustomCount">0/300</span>
+  </div>
+
+  <div class="charts-strip" id="chartsStrip">
+    <div class="chart-box" id="chartPassRun"></div>
+    <div class="chart-box" id="chartCoverage"></div>
+    <div class="chart-box" id="chartDowns"></div>
+  </div>
+
+  <div class="table-section">
+    <div class="section-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="section-title" id="sectionTitlePlays">Registro de Jogadas</div>
+        <span id="playCountBadge" style="display:none;background:rgba(200,241,53,.12);border:1px solid var(--accent);color:var(--accent);font-size:9px;letter-spacing:1px;padding:2px 8px"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm" id="btnFlagFilter" onclick="toggleFlagFilter()" title="Mostrar só jogadas destacadas" style="border-color:var(--muted);color:var(--muted)">&#9733; Destacadas</button>
+        <button class="btn" onclick="addRow()">+ Nova Jogada</button>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr id="tableHeaderRow">
+            <th>#</th>
+            <th>&#9733;</th>
+            <th class="sortable" onclick="toggleSort('quarter')" id="th-quarter">Q</th>
+            <th class="sortable" onclick="toggleSort('yardLine')" id="th-yardLine">Yard Line</th>
+            <th class="sortable" onclick="toggleSort('down')" id="th-down">Down</th>
+            <th class="sortable" onclick="toggleSort('distance')" id="th-distance">Distância</th>
+            <th class="sortable" onclick="toggleSort('personnel')" id="th-personnel">Personnel</th>
+            <th class="sortable" onclick="toggleSort('type')" id="th-type">Tipo</th>
+            <th class="sortable" onclick="toggleSort('runType')" id="th-runType">T. Corrida</th>
+            <th>Form. Off.</th>
+            <th class="sortable" onclick="toggleSort('hash')" id="th-hash">Hash</th>
+            <th class="sortable" onclick="toggleSort('defFormation')" id="th-defFormation">Form. Def.</th>
+            <th class="sortable" onclick="toggleSort('coverage')" id="th-coverage">Coverage</th>
+            <th class="sortable" onclick="toggleSort('pressure')" id="th-pressure">Pressão</th>
+            <th>Conceito / Rota</th>
+            <th class="sortable" onclick="toggleSort('result')" id="th-result">Resultado</th>
+            <th class="sortable" onclick="toggleSort('yards')" id="th-yards">Metros</th>
+            <th class="sortable" onclick="toggleSort('fieldZone')" id="th-fieldZone" style="display:none">Pos. Final</th>
+            <th>Obs.</th><th></th>
+          </tr>
+          <tr class="filter-row">
+            <th></th>
+            <th></th>
+            <th><select id="fQuarter" onchange="setFilter('quarter',this.value)"><option value="">—</option></select></th>
+            <th><input id="fYardLine" type="text" placeholder="..." oninput="setFilter('yardLine',this.value)"></th>
+            <th><select id="fDown" onchange="setFilter('down',this.value)"><option value="">—</option></select></th>
+            <th><input id="fDist" type="text" placeholder="..." oninput="setFilter('distance',this.value)"></th>
+            <th><select id="fPersonnel" onchange="setFilter('personnel',this.value)"><option value="">—</option></select></th>
+            <th><select id="fType" onchange="setFilter('type',this.value)"><option value="">—</option></select></th>
+            <th><select id="fRunType" onchange="setFilter('runType',this.value)"><option value="">—</option></select></th>
+            <th><input id="fForm" type="text" placeholder="..." oninput="setFilter('formation',this.value)"></th>
+            <th><select id="fHash" onchange="setFilter('hash',this.value)"><option value="">—</option></select></th>
+            <th><select id="fDefForm" onchange="setFilter('defFormation',this.value)"><option value="">—</option></select></th>
+            <th><select id="fCov" onchange="setFilter('coverage',this.value)"><option value="">—</option></select></th>
+            <th><select id="fPressure" onchange="setFilter('pressure',this.value)"><option value="">—</option></select></th>
+            <th><input id="fRoute" type="text" placeholder="..." oninput="setFilter('route',this.value)"></th>
+            <th><select id="fResult" onchange="setFilter('result',this.value)"><option value="">—</option></select></th>
+            <th><input id="fYards" type="text" placeholder="..." oninput="setFilter('yards',this.value)"></th>
+            <th style="display:none"><select id="fZone" onchange="setFilter('fieldZone',this.value)"><option value="">—</option></select></th>
+            <th><input id="fObs" type="text" placeholder="..." oninput="setFilter('obs',this.value)"></th>
+            <th><button class="btn btn-sm" id="filterClearBtn" onclick="clearFilters()" title="Limpar filtros" style="padding:2px 6px;position:relative">✕<span class="filter-badge" id="filterBadge" style="display:none"></span></button></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="addRow()">+ adicionar jogada</button>
+      <div class="pagination-bar" id="paginationBar" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="ai-panel" id="aiPanel">
+    <div class="ai-panel-header">
+      <div>
+        <div class="ai-panel-title">⚡ Análise Tática — IA</div>
+        <div class="ai-tabs" id="aiTabs"></div>
+      </div>
+      <button class="btn btn-sm" onclick="document.getElementById('aiPanel').classList.remove('visible')">Fechar</button>
+    </div>
+    <div class="ai-panel-body" id="aiOutput"></div>
+  </div>
+
+  <div class="notes-section" id="notesSection">
+    <div class="notes-header" onclick="toggleNotes()">
+      <span class="notes-label">📝 Notas do Jogo</span>
+      <button class="notes-toggle-btn" id="notesToggleBtn">▶ expandir</button>
+    </div>
+    <div id="notesBody" style="display:none">
+      <textarea class="notes-textarea" id="gameNotes"
+        placeholder="Anotações livres, tendências observadas, impressões gerais sobre o jogo..."
+        oninput="saveGame()"></textarea>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <span class="footer-note">Dados salvos automaticamente por jogo</span>
+  </div>
+</div>
+
+<!-- MODAL: Comparar Jogos -->
+<div class="modal-overlay" id="modalCompare">
+  <div class="modal" style="width:680px;max-width:97vw;max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-title">⩵ Comparar Jogos</div>
+    <div class="compare-header">
+      <select class="compare-sel" id="compareSelA" onchange="renderCompare()"><option value="">— Jogo A —</option></select>
+      <select class="compare-sel" id="compareSelB" onchange="renderCompare()"><option value="">— Jogo B —</option></select>
+    </div>
+    <div id="compareBody" style="flex:1;overflow-y:auto"><div class="compare-empty">Selecione dois jogos para comparar.</div></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('modalCompare')">Fechar</button></div>
+  </div>
+</div>
+
+<!-- MODAL: Importar -->
+<div class="modal-overlay" id="modalImport">
+  <div class="modal" style="width:480px;max-width:95vw">
+    <div class="modal-title">↑ Importar Dados</div>
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;line-height:1.8;margin-bottom:4px">
+      Importe um arquivo <b style="color:var(--accent)">.json</b> exportado pelo P.A.N.D.A. para restaurar todos os dados, ou um <b style="color:var(--accent)">.csv</b> de jogadas para um jogo específico.
+    </div>
+    <div class="import-dropzone" id="importDropzone" onclick="document.getElementById('importFileInput').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleImportDrop(event)">
+      <div class="import-dropzone-label">📂 Clique ou arraste o arquivo aqui</div>
+      <div class="import-dropzone-sub">.json (backup completo) ou .csv (jogadas)</div>
+    </div>
+    <input type="file" id="importFileInput" accept=".json,.csv" style="display:none" onchange="handleImportFile(this.files[0])">
+    <div id="importStatus" style="font-size:11px;letter-spacing:1px;margin-top:10px;min-height:18px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="exportFullBackup()">&#x2193; Baixar Backup JSON</button>
+      <button class="btn" onclick="closeModal('modalImport')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Visualizar Análise IA -->
+<div class="modal-overlay" id="modalViewAI">
+  <div class="modal" style="width:720px;max-width:97vw;max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-title" style="margin-bottom:8px">📊 Análise Tática — IA</div>
+    <div id="viewAIGameLabel" style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:14px"></div>
+    <div id="viewAIContent" style="flex:1;overflow-y:auto;background:var(--bg);border:1px solid var(--border);padding:16px;line-height:1.8;color:#ccc;white-space:pre-wrap;font-size:12px;min-height:200px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" id="viewAIDownloadBtn" onclick="downloadLastAI()">&#x2193; Baixar .doc</button>
+      <button class="btn btn-sm" id="viewAICopyBtn" onclick="copyAIText()">&#x2398; Copiar texto</button>
+      <button class="btn" onclick="closeModal('modalViewAI')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Novo Time -->
+<div class="modal-overlay" id="modalTeam">
+  <div class="modal">
+    <div class="modal-title">Novo Time Adversário</div>
+    <label>Nome do Time</label>
+    <input type="text" id="newTeamName" placeholder="ex: Spartans">
+    <label>Liga / Campeonato</label>
+    <input type="text" id="newTeamLeague" placeholder="ex: LAAB 2026">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modalTeam')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createTeam()">Criar Time</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Configurações -->
+<div class="modal-overlay" id="modalConfig">
+  <div class="modal" style="width:520px;max-width:95vw">
+    <div class="modal-title">Configurações</div>
+    <label>Chave de API Groq</label>
+    <input type="password" id="configApiKey" placeholder="gsk_..." autocomplete="off">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:8px;line-height:1.7">
+      Disponível apenas para administrador.<br>
+      Obtenha sua chave em <b style="color:var(--accent)">console.groq.com/keys</b>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:18px 0 14px"></div>
+    <label>Configuração Firebase (JSON)</label>
+    <textarea id="configFirebase" rows="6"
+      placeholder='{&#10;  "apiKey": "SUA_API_KEY",&#10;  "authDomain": "SEU_PROJETO.firebaseapp.com",&#10;  "projectId": "SEU_PROJETO",&#10;  "storageBucket": "SEU_PROJETO.appspot.com",&#10;  "messagingSenderId": "ID",&#10;  "appId": "APP_ID"&#10;}'
+      style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px;padding:8px;outline:none;resize:vertical;line-height:1.5"></textarea>
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:8px;line-height:1.7">
+      Apenas administradores podem alterar a conexão do Firebase.<br>
+      <b style="color:var(--accent)">Firebase Console → Config. do projeto → Seus apps → Web</b>
+    </div>
+    <div id="firebaseStatus" style="font-size:10px;letter-spacing:1px;margin-top:10px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger btn-sm" onclick="clearApiKey()">Limpar Groq</button>
+      <button class="btn btn-danger btn-sm" onclick="clearFirebaseConfig()">Limpar Firebase</button>
+      <button class="btn" onclick="closeModal('modalConfig')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveApiKey()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Novo Jogo -->
+<div class="modal-overlay" id="modalGame">
+  <div class="modal">
+    <div class="modal-title">Novo Jogo</div>
+    <label>Identificação do Jogo</label>
+    <input type="text" id="newGameName" placeholder="ex: Jogo 1 — Fase de Grupos">
+    <label>Data</label>
+    <input type="date" id="newGameDate">
+    <label>Fase</label>
+    <select id="newGamePhase">
+      <option value="">—</option>
+      <option>Fase de grupos</option><option>Quartas</option>
+      <option>Semi</option><option>Final</option><option>Amistoso</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modalGame')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createGame()">Criar Jogo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Compartilhar Time -->
+<div class="modal-overlay" id="modalShare">
+  <div class="modal" style="width:460px;max-width:95vw">
+    <div class="modal-title">👤 Compartilhar Time</div>
+    <div id="shareTeamName" style="color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;margin-bottom:16px"></div>
+    <label>Email do usuário</label>
+    <input type="email" id="shareEmail" placeholder="usuario@email.com" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:10px 12px;outline:none;margin-bottom:8px" onkeydown="if(event.key==='Enter')addShareMember()">
+    <div style="display:flex;gap:8px">
+      <select id="shareRole" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:10px;outline:none;cursor:pointer">
+        <option value="viewer">📖 Leitura</option>
+        <option value="editor" selected>✏️ Edição</option>
+      </select>
+      <button class="btn btn-primary" onclick="addShareMember()" style="flex:1">+ Adicionar</button>
+    </div>
+    <div id="shareError" style="color:var(--danger);font-size:10px;letter-spacing:1px;margin-top:8px;min-height:14px"></div>
+    <div class="share-members" id="shareMembers"></div>
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:14px;line-height:1.8">
+      <b style="color:var(--accent)">Leitura</b> — pode ver os jogos mas não editar<br>
+      <b style="color:var(--accent)">Edição</b> — pode adicionar e editar jogadas
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modalShare')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL MODAL -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal-box" style="width:700px;max-width:96vw;max-height:82vh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);padding:28px 28px 20px">
+    <div class="modal-title" style="margin-bottom:12px">⚙ Painel Administrativo</div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" id="tabPending" onclick="switchAdminTab('pending')">Pendentes</button>
+      <button class="admin-tab" id="tabAll" onclick="switchAdminTab('all')">Todos os Usuários</button>
+      <button class="admin-tab" id="tabContent" onclick="switchAdminTab('content')">Conteúdo</button>
+    </div>
+    <div id="adminSearchBar" class="admin-search-bar" style="display:none">
+      <input class="admin-search-input" id="adminSearchInput" type="text" placeholder="Buscar por email..." oninput="renderAdminUsers()">
+      <button class="admin-filter-btn active" id="aFiltAll" onclick="setAdminFilter('all')">Todos</button>
+      <button class="admin-filter-btn" id="aFiltApproved" onclick="setAdminFilter('approved')">Aprovados</button>
+      <button class="admin-filter-btn" id="aFiltPending" onclick="setAdminFilter('pending_only')">Pendentes</button>
+      <button class="admin-filter-btn" id="aFiltAdmin" onclick="setAdminFilter('admin')">Admins</button>
+    </div>
+    <div id="adminUsersList" class="admin-users-list" style="flex:1;overflow-y:auto;min-height:120px"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn" onclick="closeModal('adminModal')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN IMPERSONATION BAR -->
+<div id="adminImpersonateBar">
+  <span class="impersonate-label">👁 Visualizando como:</span>
+  <span id="adminImpersonateEmail" class="impersonate-email"></span>
+  <span style="color:var(--muted);font-size:10px;letter-spacing:1px">(modo admin — editações afetam a conta do usuário)</span>
+  <button class="btn btn-sm" style="border-color:var(--accent2);color:var(--accent2);flex-shrink:0" onclick="exitAdminView()">✕ Sair desta conta</button>
+</div>
+
+<!-- MODAL: Reportar Bug -->
+<div class="modal-overlay" id="modalBugReport">
+  <div class="modal" style="width:460px;max-width:95vw">
+    <div class="modal-title">🐛 Reportar Bug</div>
+    <label>Descreva o problema</label>
+    <textarea class="bug-textarea" id="bugDesc" rows="5" placeholder="Descreva o que aconteceu, como reproduzir o problema e o que você esperava que acontecesse..."></textarea>
+    <div id="bugError" style="color:var(--danger);font-size:11px;letter-spacing:1px;margin-top:8px;min-height:14px"></div>
+    <div id="bugSuccess" class="bug-success" style="display:none">✓ Relatório enviado com sucesso!</div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeBugReportModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btnSendBug" onclick="submitBugReport()">Enviar Relatório</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// ── NOTIFICAÇÃO DE ERROS AO ADMIN ──
+function notifyErrorToAdmin(context, error) {
+  const detail = error?.message || String(error);
+  const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : 'não logado';
+  const payload = {
+    userEmail,
+    description: `[ERRO AUTOMÁTICO]\nContexto: ${context}\nErro: ${detail}\nURL: ${window.location.href}\nData: ${new Date().toISOString()}\nUser-Agent: ${navigator.userAgent}`
+  };
+  fetch('/api/report-bug', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).catch(() => {});
+}
+
+let db = { teams: {} };
+let currentTeamId = null;
+let currentGameId = null;
+let currentUser = null; // Firebase Auth user
+
+const DOWN = ['1º Down','2º Down','3º Down','4º Down','Extra Point'];
+const TYPE = ['Passe','Corrida','Penalidade','Turnover','Punt/Kick'];
+const SIDE = ['Esquerda','Centro','Direita','Rollout Esq.','Rollout Dir.'];
+const RESULT_BASE = ['Conversão','Incompleto','Perda de yarda','Interceptação','Touchdown','Flag','Punt'];
+const RESULT_FULLPAD = ['Conversão','Incompleto','Perda de yarda','Interceptação','Fumble','Touchdown','Flag','Punt'];
+const DEF_FORM = ['2 DLs','3 DLs','4 DLs','Blitz'];
+const DEF_FORM_FULLPAD = ['3-3','4-4','3-4','4-3','Nickel','Dime','Dollar'];
+const COVERAGE = ['Cover 0','Cover 1','Cover 2','Cover 3','Cover 4'];
+const COVERAGE_FULLPAD = ['Cover 0','Cover 1','Cover 2','Cover 3','Cover 4','Cover 5','Cover 6','Cover 7','Cover 8','Cover 9'];
+const FIELD_ZONE = ['Curto Direita','Curto Centro','Curto Esquerda','Médio Direita','Médio Centro','Médio Esquerda','Longo Direita','Longo Centro','Longo Esquerda'];
+const QUARTER = ['Q1','Q2','Q3','Q4','OT'];
+const PERSONNEL = ['10 pessoal','11 pessoal','12 pessoal','20 pessoal','21 pessoal','22 pessoal'];
+const PRESSURE = ['Pocket clean','Pressão leve','Pressão forte','Sack','Scramble'];
+const RUN_TYPE = ['Inside','RPO','Outside','Draw','Sweep','Wildcat','Reverse'];
+const HASH = ['Hash Esq.','Centro','Hash Dir.'];
+
+function getResult(modality) { return modality === 'Full Pad' ? RESULT_FULLPAD : RESULT_BASE; }
+function getDefFormation(modality) { return modality === 'Full Pad' ? DEF_FORM_FULLPAD : DEF_FORM; }
+function getCoverage(modality) { return modality === 'Full Pad' ? COVERAGE_FULLPAD : COVERAGE; }
+
+function plays() { return db.teams[currentTeamId]?.games[currentGameId]?.plays || []; }
+
+// ── FIREBASE CLIENT ──
+let _firebaseApp = null;
+let _firebaseDb  = null;
+let _firebaseAuth = null;
+let _authMode = 'login';
+let _adminViewingUid = null;   // UID do usuário sendo visualizado pelo admin
+let _adminViewingEmail = null;
+
+async function initFirebaseClient() {
+  // Config padrão embutida (segura — proteção via Firebase Security Rules)
+  const DEFAULT_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDe432u_RVaqor9BJjEXA8tYe9zVpTpwJc",
+    authDomain: "rampage-scout.firebaseapp.com",
+    projectId: "rampage-scout",
+    storageBucket: "rampage-scout.firebasestorage.app",
+    messagingSenderId: "376991405917",
+    appId: "1:376991405917:web:793ec1780c60760fe63ab4",
+    measurementId: "G-0HD90699QN"
+  };
+  let raw = localStorage.getItem('panda_firebase_config');
+  let config;
+  if (raw) {
+    try { config = JSON.parse(raw); } catch(e) { config = null; }
+  }
+  if (!config || !config.projectId) {
+    config = DEFAULT_FIREBASE_CONFIG;
+    localStorage.setItem('panda_firebase_config', JSON.stringify(config));
+  }
+  if (!config.projectId) return;
+  if (typeof firebase === 'undefined') return;
+  try {
+    if (firebase.apps.length > 0) {
+      _firebaseApp = firebase.app();
+    } else {
+      _firebaseApp = firebase.initializeApp(config);
+    }
+    _firebaseDb   = firebase.firestore();
+    _firebaseAuth = firebase.auth();
+    console.info('[PANDA] Firebase client SDK inicializado — projeto:', config.projectId);
+
+    // Observa estado de autenticação
+    _firebaseAuth.onAuthStateChanged(async user => {
+      currentUser = user;
+      if (user) {
+        await ensureUserProfile(user);
+        await checkApproval(user);
+      } else {
+        hidePendingScreen();
+        showLoginScreen();
+      }
+    });
+  } catch(e) {
+    console.warn('[PANDA] Erro ao inicializar Firebase client:', e);
+  }
+}
+
+// ── ADMIN CONFIG ──
+const ADMIN_EMAILS = ['gallassileonardo@gmail.com'];
+let currentUserRole = null; // 'admin' | 'user'
+
+// ── PAYWALL ──
+async function ensureUserProfile(user) {
+  if (!_firebaseDb) return;
+  const isAdmin = ADMIN_EMAILS.includes((user.email || '').toLowerCase());
+  const ref = _firebaseDb.collection('userProfiles').doc(user.uid);
+  const snap = await ref.get().catch(() => null);
+  if (!snap || !snap.exists) {
+    // Perfil novo — disparar notificações
+    await ref.set({
+      email: user.email,
+      displayName: user.displayName || '',
+      approved: isAdmin ? true : false,
+      role: isAdmin ? 'admin' : 'user',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      firstLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {});
+    if (!isAdmin) {
+      // Notificar admin sobre novo cadastro
+      fetch('/api/notify-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: user.email, userName: user.displayName || '' })
+      }).then(r => r.json()).then(d => {
+        if (!d.sent) console.warn('[PANDA] notify-admin falhou:', d.reason);
+        else console.info('[PANDA] notify-admin enviado.');
+      }).catch(e => console.warn('[PANDA] notify-admin erro de conexão:', e.message));
+      // Email de boas-vindas ao usuário
+      fetch('/api/confirm-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: user.email, userName: user.displayName || '' })
+      }).catch(() => {});
+    }
+  } else if (isAdmin && snap.data().role !== 'admin') {
+    await ref.update({ role: 'admin', approved: true }).catch(() => {});
+  }
+}
+
+async function checkApproval(user) {
+  if (!_firebaseDb) { currentUserRole = 'user'; showAppForUser(user); return; }
+  try {
+    const snap = await _firebaseDb.collection('userProfiles').doc(user.uid).get();
+    const data = snap.exists ? snap.data() : {};
+    currentUserRole = data.role === 'admin' ? 'admin' : 'user';
+    if (currentUserRole === 'admin' || data.approved === true) {
+      hidePendingScreen();
+      showAppForUser(user);
+    } else {
+      showPendingScreen(user);
+    }
+  } catch(e) {
+    currentUserRole = 'user';
+    showPendingScreen(user);
+  }
+}
+
+function showPendingScreen(user) {
+  hideLoginScreen();
+  const pending = document.getElementById('pendingScreen');
+  const emailEl = document.getElementById('pendingEmail');
+  if (emailEl) emailEl.textContent = user?.email || '';
+  if (pending) pending.classList.add('active');
+}
+
+function hidePendingScreen() {
+  const pending = document.getElementById('pendingScreen');
+  if (pending) pending.classList.remove('active');
+}
+
+async function approveUser(uid) {
+  if (!_firebaseDb) return;
+  try {
+    await _firebaseDb.collection('userProfiles').doc(uid).update({ approved: true });
+    const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
+    const userEmail = profileSnap.exists ? profileSnap.data().email : null;
+    const userName  = profileSnap.exists ? profileSnap.data().displayName : '';
+    if (userEmail) {
+      fetch('/api/notify-approved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail, userName })
+      }).catch(() => {});
+    }
+    showToast(`Usuário ${userEmail||uid} aprovado.`, 'success');
+    await renderAdminUsers();
+  } catch(e) { notifyErrorToAdmin('aprovar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
+}
+
+async function rejectUser(uid) {
+  showConfirm('Rejeitar e remover esse usuário do sistema?', async () => {
+    try {
+      await _firebaseDb.collection('userProfiles').doc(uid).delete();
+      await renderAdminUsers();
+      showToast('Usuário rejeitado e removido.', 'warning');
+    } catch(e) { notifyErrorToAdmin('rejeitar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
+  });
+}
+
+async function revokeUser(uid) {
+  showConfirm('Revogar aprovação desse usuário?', async () => {
+    try {
+      await _firebaseDb.collection('userProfiles').doc(uid).update({ approved: false });
+      await renderAdminUsers();
+      showToast('Acesso revogado.', 'warning');
+    } catch(e) { notifyErrorToAdmin('revogar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
+  });
+}
+
+let _currentAdminTab = 'pending';
+
+function openAdminPanel() {
+  if (currentUserRole !== 'admin') return;
+  _currentAdminTab = 'pending';
+  switchAdminTab('pending');
+  openModal('adminModal');
+}
+
+function switchAdminTab(tab) {
+  _currentAdminTab = tab;
+  document.getElementById('tabPending')?.classList.toggle('active', tab === 'pending');
+  document.getElementById('tabAll')?.classList.toggle('active', tab === 'all');
+  document.getElementById('tabContent')?.classList.toggle('active', tab === 'content');
+  const searchBar = document.getElementById('adminSearchBar');
+  if (searchBar) searchBar.style.display = tab === 'all' ? '' : 'none';
+  if (tab === 'content') {
+    renderAdminContent();
+  } else {
+    renderAdminUsers();
+  }
+}
+
+async function renderAdminUsers() {
+  const list = document.getElementById('adminUsersList');
+  list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Carregando...</div>';
+  if (!_firebaseDb) { list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Firebase não conectado.</div>'; return; }
+  try {
+    const snap = await _firebaseDb.collection('userProfiles').get();
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Filtro por tab
+    if (_currentAdminTab === 'pending') {
+      docs = docs.filter(u => !u.approved && u.role !== 'admin');
+    }
+    // Filtro de status (aba "all")
+    if (_currentAdminTab === 'all' && _adminStatusFilter !== 'all') {
+      if (_adminStatusFilter === 'approved') docs = docs.filter(u => u.approved);
+      else if (_adminStatusFilter === 'pending_only') docs = docs.filter(u => !u.approved && u.role !== 'admin');
+      else if (_adminStatusFilter === 'admin') docs = docs.filter(u => u.role === 'admin');
+    }
+    // Busca por email
+    const search = (document.getElementById('adminSearchInput')?.value || '').trim().toLowerCase();
+    if (search) docs = docs.filter(u => (u.email || '').toLowerCase().includes(search));
+    if (!docs.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Nenhum usuário encontrado.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    docs.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'admin-user-row';
+      const roleClass = u.role === 'admin' ? 'admin' : 'user';
+      const roleLabel = u.role === 'admin' ? 'Admin' : 'Usuário';
+      const statusClass = u.approved ? 'approved' : 'pending';
+      const statusLabel = u.approved ? '✓ Aprovado' : '⏳ Pendente';
+      const created = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—';
+      const firstLogin = u.firstLoginAt?.toDate ? u.firstLoginAt.toDate().toLocaleDateString('pt-BR') : (u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—');
+      const isCurrentAdmin = u.id === currentUser?.uid;
+      row.innerHTML = `
+        <div class="admin-user-email">${u.email || u.id}${isCurrentAdmin ? ' <span style="color:var(--muted);font-size:9px">(você)</span>' : ''}</div>
+        <span class="admin-user-role ${roleClass}">${roleLabel}</span>
+        <span class="admin-user-status ${statusClass}">${statusLabel}</span>
+        <div class="admin-user-meta-dates">
+          <span class="admin-user-meta-date" title="Data de cadastro">📅 assinante desde ${created}</span>
+          <span class="admin-user-meta-date" title="Primeiro login">🔑 1º login: ${firstLogin}</span>
+        </div>
+        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-primary" onclick="approveUser('${u.id}')">Aprovar</button>` : ''}
+        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="rejectUser('${u.id}')">Rejeitar</button>` : ''}
+        ${u.approved && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="opacity:.5" onclick="revokeUser('${u.id}')">Revogar</button>` : ''}
+      `;
+      list.appendChild(row);
+    });
+  } catch(e) {
+    notifyErrorToAdmin('carregar usuários pendentes', e);
+    list.innerHTML = `<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar. O administrador foi notificado.</div>`;
+  }
+}
+
+async function renderAdminContent() {
+  const list = document.getElementById('adminUsersList');
+  list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Carregando dados...</div>';
+  if (!_firebaseDb) { list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Firebase não conectado.</div>'; return; }
+  try {
+    // Carregar todos os perfis
+    const profilesSnap = await _firebaseDb.collection('userProfiles').get();
+    if (profilesSnap.empty) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Nenhum usuário cadastrado.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    list.style.gap = '0';
+
+    for (const profileDoc of profilesSnap.docs) {
+      const profile = profileDoc.data();
+      const uid = profileDoc.id;
+
+      // Buscar dados do usuário
+      let userTeams = {};
+      let totalTeams = 0;
+      let totalGames = 0;
+      try {
+        const dataDoc = await _firebaseDb.collection('users').doc(uid).collection('shared').doc('data').get();
+        if (dataDoc.exists && dataDoc.data()?.data?.teams) {
+          userTeams = dataDoc.data().data.teams;
+          totalTeams = Object.keys(userTeams).length;
+          totalGames = Object.values(userTeams).reduce((sum, t) => sum + Object.keys(t.games || {}).length, 0);
+        }
+      } catch(e) { /* sem dados */ }
+
+        const totalPlays = Object.values(userTeams).reduce((sum, t) => sum + Object.values(t.games || {}).reduce((s, g) => s + (g.plays||[]).length, 0), 0);
+      const isMe = uid === currentUser?.uid;
+      const roleLabel = profile.role === 'admin' ? ' · ADMIN' : '';
+      const statusLabel = profile.approved ? '✓' : '⏳';
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'admin-content-user';
+
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'admin-content-user-header';
+      const safeEmail = (profile.email || uid).replace(/'/g, '&#39;');
+      headerDiv.innerHTML = `
+        <span class="admin-content-user-email">${profile.email || uid}${isMe ? ' <span style="color:var(--muted);font-size:9px">(você)</span>' : ''}${roleLabel}</span>
+        <span class="admin-content-user-meta">${statusLabel} · ${totalTeams} time${totalTeams !== 1 ? 's' : ''} · ${totalGames} jogo${totalGames !== 1 ? 's' : ''} · ${totalPlays} jog.</span>
+        ${!isMe ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="event.stopPropagation();adminViewUser('${uid}','${safeEmail}')">→ Acessar</button>` : ''}
+        <span class="admin-content-chevron" id="chev-${uid}">›</span>
+      `;
+
+      const teamsDiv = document.createElement('div');
+      teamsDiv.className = 'admin-content-teams';
+      teamsDiv.id = `teams-${uid}`;
+
+      if (totalTeams === 0) {
+        teamsDiv.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:8px 0;letter-spacing:1px">Sem times cadastrados.</div>';
+      } else {
+        Object.values(userTeams).forEach(team => {
+          const games = Object.values(team.games || {});
+          const gamePills = games.map(g =>
+            `<span class="admin-game-pill">${g.name}${g.date ? ' · ' + g.date : ''} · ${(g.plays || []).length} jog.</span>`
+          ).join('');
+          teamsDiv.innerHTML += `
+            <div class="admin-team-row">
+              <div class="admin-team-name">${team.name}</div>
+              <div class="admin-team-meta">${team.league || 'Sem liga'} · ${games.length} jogo${games.length !== 1 ? 's' : ''}</div>
+              <div style="margin-top:6px">${gamePills || '<span style="color:#333;font-size:10px">Nenhum jogo</span>'}</div>
+            </div>`;
+        });
+      }
+
+      // Toggle ao clicar no header
+      headerDiv.addEventListener('click', () => {
+        const isOpen = teamsDiv.classList.contains('open');
+        teamsDiv.classList.toggle('open', !isOpen);
+        document.getElementById(`chev-${uid}`)?.classList.toggle('open', !isOpen);
+      });
+
+      wrapper.appendChild(headerDiv);
+      wrapper.appendChild(teamsDiv);
+      list.appendChild(wrapper);
+    }
+  } catch(e) {
+    notifyErrorToAdmin('carregar conteúdo admin', e);
+    list.innerHTML = `<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar. O administrador foi notificado.</div>`;
+  }
+}
+
+// ── ADMIN IMPERSONATION ──
+async function adminViewUser(uid, email) {
+  if (currentUserRole !== 'admin') return;
+  closeModal('adminModal');
+  _adminViewingUid = uid;
+  _adminViewingEmail = email;
+  document.getElementById('adminImpersonateEmail').textContent = email;
+  document.getElementById('adminImpersonateBar').classList.add('visible');
+  db = { teams: {} };
+  await loadDB();
+  goHome();
+}
+
+async function exitAdminView() {
+  _adminViewingUid = null;
+  _adminViewingEmail = null;
+  document.getElementById('adminImpersonateBar').classList.remove('visible');
+  db = { teams: {} };
+  await loadDB();
+  goHome();
+}
+
+// ── SHARING ──
+async function openShareModal() {
+  if (!_firebaseDb || !currentUser) return;
+  const t = db.teams[currentTeamId];
+  document.getElementById('shareTeamName').textContent = t.name;
+  document.getElementById('shareEmail').value = '';
+  document.getElementById('shareError').textContent = '';
+  await renderShareMembers();
+  openModal('modalShare');
+}
+
+async function renderShareMembers() {
+  const container = document.getElementById('shareMembers');
+  container.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:8px">Carregando...</div>';
+  try {
+    const snap = await _firebaseDb
+      .collection('shares')
+      .where('teamId', '==', currentTeamId)
+      .where('ownerUid', '==', currentUser.uid)
+      .get();
+    if (snap.empty) {
+      container.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:8px;letter-spacing:1px">Nenhum compartilhamento ainda.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const row = document.createElement('div');
+      row.className = 'share-member-row';
+      const viewerSel = d.role === 'viewer' ? 'selected' : '';
+      const editorSel = d.role === 'editor' ? 'selected' : '';
+      row.innerHTML = `
+        <span class="share-member-email">${d.sharedWithEmail}</span>
+        <select class="share-member-role-select" onchange="updateShareRole('${doc.id}', this.value)" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;outline:none;cursor:pointer">
+          <option value="viewer" ${viewerSel}>📖 Leitura</option>
+          <option value="editor" ${editorSel}>✏️ Edição</option>
+        </select>
+        <button class="share-member-del" onclick="removeShare('${doc.id}')" title="Remover">×</button>
+      `;
+      container.appendChild(row);
+    });
+  } catch(e) {
+    notifyErrorToAdmin('carregar membros compartilhamento', e);
+    container.innerHTML = `<div style="color:var(--danger);font-size:10px;padding:8px">Erro ao carregar. O administrador foi notificado.</div>`;
+  }
+}
+
+async function addShareMember() {
+  const email = document.getElementById('shareEmail').value.trim().toLowerCase();
+  const role  = document.getElementById('shareRole').value;
+  const errEl = document.getElementById('shareError');
+  errEl.textContent = '';
+  if (!email) { errEl.textContent = 'Informe o email.'; return; }
+  if (email === currentUser.email.toLowerCase()) { errEl.textContent = 'Você já é o dono deste time.'; return; }
+
+  // Verificar se o usuário existe e está aprovado
+  try {
+    const profileSnap = await _firebaseDb
+      .collection('userProfiles')
+      .where('email', '==', email)
+      .limit(1)
+      .get();
+    if (profileSnap.empty) { errEl.textContent = 'Usuário não encontrado no sistema.'; return; }
+    const profileData = profileSnap.docs[0].data();
+    if (!profileData.approved) { errEl.textContent = 'Esse usuário ainda não foi aprovado pelo admin.'; return; }
+    const sharedWithUid = profileSnap.docs[0].id;
+
+    // Verificar se já foi compartilhado
+    const existing = await _firebaseDb
+      .collection('shares')
+      .where('teamId', '==', currentTeamId)
+      .where('ownerUid', '==', currentUser.uid)
+      .where('sharedWithUid', '==', sharedWithUid)
+      .limit(1)
+      .get();
+    if (!existing.empty) { errEl.textContent = 'Já compartilhado com esse usuário.'; return; }
+
+    // Criar documento de compartilhamento
+    const t = db.teams[currentTeamId];
+    await _firebaseDb.collection('shares').add({
+      teamId: currentTeamId,
+      ownerUid: currentUser.uid,
+      ownerEmail: currentUser.email,
+      sharedWithUid,
+      sharedWithEmail: email,
+      role,
+      teamName: t.name,
+      teamLeague: t.league || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('shareEmail').value = '';
+    await renderShareMembers();
+  } catch(e) {
+    errEl.textContent = 'Erro ao compartilhar. O administrador foi notificado.';
+    notifyErrorToAdmin('adicionar compartilhamento', e);
+  }
+}
+
+async function updateShareRole(shareDocId, newRole) {
+  try {
+    await _firebaseDb.collection('shares').doc(shareDocId).update({ role: newRole });
+    showToast(`Permissão alterada para ${newRole === 'editor' ? 'Edição' : 'Leitura'}.`, 'success');
+  } catch(e) {
+    showToast('Erro ao alterar permissão. O administrador foi notificado.', 'error');
+    notifyErrorToAdmin('alterar role compartilhamento', e);
+    await renderShareMembers();
+  }
+}
+
+async function removeShare(shareDocId) {
+  showConfirm('Remover compartilhamento?', async () => {
+    try {
+      await _firebaseDb.collection('shares').doc(shareDocId).delete();
+      await renderShareMembers();
+      showToast('Compartilhamento removido.', 'warning');
+    } catch(e) { notifyErrorToAdmin('remover compartilhamento', e); showToast('Erro ao remover. O administrador foi notificado.', 'error'); }
+  });
+}
+
+// Carregar times compartilhados comigo
+async function loadSharedTeams() {
+  if (!_firebaseDb || !currentUser) return [];
+  try {
+    const snap = await _firebaseDb
+      .collection('shares')
+      .where('sharedWithUid', '==', currentUser.uid)
+      .get();
+    const teams = [];
+    for (const doc of snap.docs) {
+      const s = doc.data();
+      // Carregar dados do time do dono
+      try {
+        const ownerDoc = await _firebaseDb
+          .collection('users').doc(s.ownerUid)
+          .collection('shared').doc('data')
+          .get();
+        if (ownerDoc.exists && ownerDoc.data()?.data?.teams?.[s.teamId]) {
+          teams.push({
+            shareId: doc.id,
+            teamId: s.teamId,
+            ownerUid: s.ownerUid,
+            role: s.role,
+            teamName: s.teamName,
+            teamLeague: s.teamLeague,
+            ownerEmail: s.ownerEmail,
+            teamData: ownerDoc.data().data.teams[s.teamId]
+          });
+        }
+      } catch(e) { /* sem permissão */ }
+    }
+    return teams;
+  } catch(e) {
+    return [];
+  }
+}
+
+async function renderSharedSection() {
+  const section = document.getElementById('sharedSection');
+  const container = document.getElementById('sharedTeamsContainer');
+  const teams = await loadSharedTeams();
+  if (!teams.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  const html = '<div class="teams-grid">' + teams.map(s => {
+    const games = Object.values(s.teamData?.games || {});
+    const pills = games.map(g =>
+      `<span class="game-pill" onclick="event.stopPropagation();openSharedGame('${s.ownerUid}','${s.teamId}','${g.id}','${s.role}')">${g.name}</span>`
+    ).join('');
+    const roleLabel = s.role === 'editor' ? 'Edição' : 'Leitura';
+    const roleColor = s.role === 'editor' ? 'var(--accent2)' : 'var(--accent)';
+    return `<div class="team-card" onclick="openSharedTeam('${s.ownerUid}','${s.teamId}','${s.role}','${s.ownerEmail}')" style="padding-top:32px">
+      <div class="team-card-shared-badge">👤 Compartilhado</div>
+      <div class="team-card-name">${s.teamName}</div>
+      <div class="team-card-meta">${s.teamLeague||''} · ${games.length} jogo${games.length!==1?'s':''} · <span style="color:${roleColor}">${roleLabel}</span></div>
+      <div class="team-card-meta" style="margin-top:2px">por ${s.ownerEmail}</div>
+      <div class="team-card-games">${pills||'<span style="color:#333;font-size:10px">Nenhum jogo ainda</span>'}</div>
+    </div>`;
+  }).join('') + '</div>';
+  container.innerHTML = html;
+}
+
+// Abrir time compartilhado (dono é outro usuário)
+let sharedContext = null; // { ownerUid, teamId, role }
+
+function openSharedTeam(ownerUid, teamId, role, ownerEmail) {
+  sharedContext = { ownerUid, teamId, role, ownerEmail };
+  // Buscar dados do time do dono
+  if (!_firebaseDb) return;
+  _firebaseDb.collection('users').doc(ownerUid).collection('shared').doc('data').get()
+    .then(doc => {
+      if (!doc.exists) return;
+      const teamData = doc.data()?.data?.teams?.[teamId];
+      if (!teamData) return;
+      currentTeamId = teamId;
+      currentGameId = null;
+      document.getElementById('bc-team-name').textContent = teamData.name + ' (👤)';
+      document.getElementById('tvName').textContent = teamData.name;
+      document.getElementById('tvMeta').textContent = (teamData.league||'') + ' — por ' + ownerEmail;
+      // Atualizar visibilidade dos botões conforme papel
+      const canEdit = role === 'editor';
+      document.getElementById('btnNewGame').style.display = canEdit ? '' : 'none';
+      document.getElementById('btnDeleteTeam').style.display = 'none';
+      document.getElementById('btnShareTeam').style.display = 'none';
+      // Usar dados locais temporários do time compartilhado
+      db.teams[teamId] = teamData;
+      renderGames();
+      showView('team');
+      setHash(`#/team/${teamId}`);
+    })
+    .catch(e => { notifyErrorToAdmin('abrir time compartilhado', e); alert('Erro ao abrir time. O administrador foi notificado.'); });
+}
+
+function openSharedGame(ownerUid, teamId, gameId, role) {
+  sharedContext = { ownerUid, teamId, gameId, role };
+  openSharedTeam(ownerUid, teamId, role, '');
+  // Depois de carregar o time, abrir o jogo
+  setTimeout(() => {
+    if (db.teams[teamId]?.games[gameId]) openGame(teamId, gameId);
+  }, 500);
+}
+
+function showLoginScreen() {
+  document.getElementById('loginScreen').classList.add('active');
+  document.getElementById('appHeader').style.display = 'none';
+  // Esconder todas as views
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+}
+
+function hideLoginScreen() {
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('appHeader').style.display = '';
+}
+
+function toggleAuthMode() {
+  _authMode = _authMode === 'login' ? 'register' : 'login';
+  const isReg = _authMode === 'register';
+  document.getElementById('loginTitle').textContent = isReg ? 'CRIAR CONTA' : 'ENTRAR';
+  document.querySelector('#loginScreen .btn-primary').textContent = isReg ? 'Criar conta' : 'Entrar';
+  document.getElementById('loginToggle').innerHTML = isReg
+    ? 'Já tem conta? <span onclick="toggleAuthMode()">Entrar</span>'
+    : 'Não tem conta? <span onclick="toggleAuthMode()">Criar conta</span>';
+  document.getElementById('authNameRow').style.display = isReg ? '' : 'none';
+  document.getElementById('authConfirmRow').style.display = isReg ? '' : 'none';
+  document.getElementById('btnForgotPassword').style.display = isReg ? 'none' : '';
+  document.getElementById('authConfirmPassword').value = '';
+  document.getElementById('authPasswordMatch').textContent = '';
+  document.getElementById('authError').textContent = '';
+}
+
+async function submitAuth() {
+  if (!_firebaseAuth) { document.getElementById('authError').textContent = 'Firebase indisponível. Verifique a configuração do ambiente.'; return; }
+  const email    = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const name     = document.getElementById('authName').value.trim();
+  const errEl    = document.getElementById('authError');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Preencha email e senha.'; return; }
+  if (_authMode === 'register') {
+    const confirmPw = document.getElementById('authConfirmPassword').value;
+    if (password !== confirmPw) { errEl.textContent = 'As senhas não coincidem.'; return; }
+  }
+  try {
+    if (_authMode === 'register') {
+      const cred = await _firebaseAuth.createUserWithEmailAndPassword(email, password);
+      if (name) await cred.user.updateProfile({ displayName: name });
+      // Enviar email de verificação Firebase
+      await cred.user.sendEmailVerification().catch(() => {});
+      // As notificações de email são disparadas em ensureUserProfile ao criar o perfil
+    } else {
+      await _firebaseAuth.signInWithEmailAndPassword(email, password);
+    }
+    // onAuthStateChanged cuida do resto
+  } catch(e) {
+    const msgs = {
+      'auth/user-not-found': 'Usuário não encontrado.',
+      'auth/wrong-password': 'Senha incorreta.',
+      'auth/email-already-in-use': 'Email já cadastrado.',
+      'auth/weak-password': 'Senha muito fraca (mín. 6 caracteres).',
+      'auth/invalid-email': 'Email inválido.',
+      'auth/invalid-credential': 'Email ou senha incorretos.',
+    };
+    errEl.textContent = msgs[e.code] || 'Erro ao autenticar. Tente novamente.';
+    if (!msgs[e.code]) notifyErrorToAdmin('login/registro', e);
+  }
+}
+
+async function loginGoogle() {
+  if (!_firebaseAuth) { document.getElementById('authError').textContent = 'Firebase indisponível. Verifique a configuração do ambiente.'; return; }
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    // Popup pode falhar em mobile — tenta popup primeiro, fallback para redirect
+    try {
+      await _firebaseAuth.signInWithPopup(provider);
+    } catch(popupErr) {
+      if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/operation-not-supported-in-this-environment') {
+        await _firebaseAuth.signInWithRedirect(provider);
+      } else {
+        throw popupErr;
+      }
+    }
+  } catch(e) {
+    document.getElementById('authError').textContent = 'Erro ao entrar com Google. Tente novamente.';
+    notifyErrorToAdmin('login Google', e);
+  }
+}
+
+function checkPasswordMatch() {
+  const pw = document.getElementById('authPassword').value;
+  const cp = document.getElementById('authConfirmPassword').value;
+  const el = document.getElementById('authPasswordMatch');
+  if (!cp) { el.textContent = ''; return; }
+  if (pw === cp) {
+    el.textContent = '✓ Senhas conferem';
+    el.style.color = 'var(--accent)';
+  } else {
+    el.textContent = '✗ Senhas não coincidem';
+    el.style.color = 'var(--danger)';
+  }
+}
+
+async function sendForgotPassword() {
+  if (!_firebaseAuth) { document.getElementById('authError').textContent = 'Firebase indisponível. Verifique a configuração do ambiente.'; return; }
+  const email = document.getElementById('authEmail').value.trim();
+  const errEl = document.getElementById('authError');
+  if (!email) { errEl.textContent = 'Informe seu email acima para redefinir a senha.'; return; }
+  try {
+    await _firebaseAuth.sendPasswordResetEmail(email);
+    errEl.style.color = 'var(--accent)';
+    errEl.textContent = '✓ Email de redefinição enviado para ' + email;
+    setTimeout(() => { errEl.textContent = ''; errEl.style.color = ''; }, 5000);
+  } catch(e) {
+    errEl.style.color = '';
+    const msgs = {
+      'auth/user-not-found': 'Nenhuma conta encontrada com este email.',
+      'auth/invalid-email': 'Email inválido.',
+    };
+    errEl.textContent = msgs[e.code] || 'Erro ao redefinir senha. Tente novamente.';
+    if (!msgs[e.code]) notifyErrorToAdmin('redefinir senha', e);
+  }
+}
+
+async function logoutUser() {
+  if (!_firebaseAuth) return;
+  if (_adminViewingUid) { await exitAdminView(); return; }
+  showConfirm('Sair da sua conta?', async () => {
+    if (_pendingListener) { _pendingListener(); _pendingListener = null; }
+    await _firebaseAuth.signOut();
+    db = { teams: {} }; currentTeamId=null; currentGameId=null; currentUserRole=null;
+    _adminViewingUid=null; _adminViewingEmail=null;
+    document.getElementById('adminBadge').style.display='none';
+    document.getElementById('btnAdminPanel').style.display='none';
+    document.getElementById('btnBugReport').style.display='none';
+    document.getElementById('btnSearch').style.display='none';
+    document.getElementById('adminImpersonateBar').classList.remove('visible');
+    showLoginScreen();
+  }, 'Sair', false);
+}
+
+function openBugReportModal() {
+  document.getElementById('bugDesc').value = '';
+  document.getElementById('bugError').textContent = '';
+  document.getElementById('bugSuccess').style.display = 'none';
+  const btn = document.getElementById('btnSendBug');
+  btn.disabled = false;
+  btn.textContent = 'Enviar Relatório';
+  openModal('modalBugReport');
+}
+
+function closeBugReportModal() {
+  closeModal('modalBugReport');
+}
+
+async function submitBugReport() {
+  const desc = document.getElementById('bugDesc').value.trim();
+  const errEl = document.getElementById('bugError');
+  const successEl = document.getElementById('bugSuccess');
+  const btn = document.getElementById('btnSendBug');
+  errEl.textContent = '';
+  if (desc.length < 10) { errEl.textContent = 'Descreva o bug com mais detalhes (mínimo 10 caracteres).'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  try {
+    const resp = await fetch('/api/report-bug', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userEmail: currentUser?.email || 'Desconhecido', description: desc })
+    });
+    const data = await resp.json();
+    if (data.sent) {
+      successEl.style.display = 'block';
+      document.getElementById('bugDesc').value = '';
+      btn.textContent = 'Enviado!';
+      setTimeout(() => closeBugReportModal(), 2000);
+    } else {
+      errEl.textContent = 'Não foi possível enviar o relatório. Tente novamente mais tarde.';
+      btn.disabled = false;
+      btn.textContent = 'Enviar Relatório';
+    }
+  } catch(e) {
+    errEl.textContent = 'Erro de conexão. Verifique se o servidor está ativo.';
+    btn.disabled = false;
+    btn.textContent = 'Enviar Relatório';
+  }
+}
+
+function showAppForUser(user) {
+  hideLoginScreen();
+  hidePendingScreen();
+  // Atualizar badge no header
+  const badge  = document.getElementById('userBadge');
+  const avatar = document.getElementById('userAvatar');
+  const emailEl = document.getElementById('userEmail');
+  badge.style.display = 'flex';
+  emailEl.textContent = user.displayName || user.email;
+  if (user.photoURL) {
+    avatar.innerHTML = `<img src="${user.photoURL}" alt="" referrerpolicy="no-referrer">`;
+  } else {
+    const initial = (user.displayName || user.email || '?')[0].toUpperCase();
+    avatar.textContent = initial;
+  }
+  // Mostrar badge e botão de admin se aplicável
+  const isAdmin = currentUserRole === 'admin';
+  document.getElementById('adminBadge').style.display = isAdmin ? '' : 'none';
+  document.getElementById('btnAdminPanel').style.display = isAdmin ? '' : 'none';
+  document.getElementById('btnConfig').style.display = isAdmin ? '' : 'none';
+  document.getElementById('btnBugReport').style.display = isAdmin ? 'none' : '';
+  document.getElementById('btnSearch').style.display = '';
+  document.getElementById('btnImport').style.display = 'none';
+  document.getElementById('btnPrint').style.display = 'none';
+  document.getElementById('btnViewAI').style.display = 'none';
+  // Carregar dados do usuário
+  loadDB().then(() => {
+    renderHome();
+    renderSharedSection();
+    handleHashRoute();
+    // Iniciar listener de pendentes para admin
+    if (currentUserRole === 'admin') startAdminPendingListener();
+  });
+}
+
+// ── PERSISTENCE ──
+function _localDbKey() {
+  const uid = _adminViewingUid || currentUser?.uid;
+  return uid ? `panda_db_${uid}` : 'panda_db';
+}
+function saveLocalDB() {
+  try { localStorage.setItem(_localDbKey(), JSON.stringify(db)); } catch(e) {}
+}
+
+function _firestoreUserDoc() {
+  // Dados isolados por usuário: users/{uid}/shared/data
+  // Em modo admin-impersonation usa o UID do usuário sendo visualizado
+  const uid = _adminViewingUid || currentUser?.uid;
+  if (_firebaseDb && uid) {
+    return _firebaseDb.collection('users').doc(uid).collection('shared').doc('data');
+  }
+  // Sem UID = sem acesso (não usar doc público compartilhado)
+  return null;
+}
+
+async function saveRemoteDB() {
+  // 1) Firebase client (direto no Firestore)
+  const docRef = _firestoreUserDoc();
+  if (docRef) {
+    try {
+      await docRef.set({
+        data: db,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      return;
+    } catch(e) {
+      console.warn('[PANDA] Falha ao salvar no Firestore (client):', e);
+    }
+  }
+  // 2) Fallback: servidor local (express)
+  const fallbackUid = _adminViewingUid || currentUser?.uid;
+  if (fallbackUid && window.location.protocol !== 'file:') {
+    try {
+      await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: fallbackUid, data: db })
+      });
+    } catch(e) {
+      console.warn('[PANDA] Falha ao salvar via servidor:', e);
+    }
+  }
+}
+
+function saveDB() {
+  // Em modo admin-impersonation nunca salvar
+  if (_adminViewingUid) return;
+  showSaveIndicator('saving');
+  saveLocalDB();
+  saveRemoteDB().then(() => showSaveIndicator('saved')).catch(() => showSaveIndicator('saved'));
+}
+
+async function loadDB() {
+  showLoading('Carregando dados...');
+  try {
+  // 1) Firebase client (direto no Firestore — dados do usuário)
+  const docRef = _firestoreUserDoc();
+  if (docRef) {
+    try {
+      const doc = await docRef.get();
+      if (doc.exists && doc.data()?.data?.teams) {
+        db = doc.data().data;
+        saveLocalDB();
+        return;
+      }
+    } catch(e) {
+      console.warn('[PANDA] Falha ao carregar do Firestore (client):', e);
+    }
+  }
+  // 2) Servidor local (express)
+  const loadUid = _adminViewingUid || currentUser?.uid;
+  if (loadUid && window.location.protocol !== 'file:') {
+    try {
+      const res = await fetch(`/api/load/${loadUid}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data?.teams) {
+          db = json.data;
+          saveLocalDB();
+          return;
+        }
+      }
+    } catch(e) {
+      console.warn('[PANDA] Falha ao carregar do servidor:', e);
+    }
+  }
+  // 3) localStorage como último recurso (isolado por UID)
+  try {
+    const r = localStorage.getItem(_localDbKey());
+    if (r) db = JSON.parse(r);
+  } catch(e) {}
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── HASH ROUTING ──
+function setHash(hash) {
+  const current = window.location.hash || '#/';
+  if (current === (hash || '#/')) return; // mesma página, não empilha
+  history.pushState(null, '', hash || '#/');
+}
+
+function handleHashRoute() {
+  const hash = window.location.hash || '#/';
+  const m2 = hash.match(/^#\/team\/([^\/]+)\/game\/([^\/]+)$/);
+  const m1 = hash.match(/^#\/team\/([^\/]+)$/);
+  if (m2) {
+    const teamId = m2[1], gameId = m2[2];
+    if (db.teams[teamId]?.games[gameId]) { openGame(teamId, gameId); return; }
+  }
+  if (m1) {
+    const teamId = m1[1];
+    if (db.teams[teamId]) { openTeam(teamId); return; }
+  }
+  goHome();
+}
+
+window.addEventListener('popstate', () => {
+  if (currentUser || !_firebaseAuth) handleHashRoute();
+});
+
+// ── VIEWS ──
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  const inScout = name === 'scout';
+  document.getElementById('btnAnalyze').style.display = inScout ? '' : 'none';
+  document.getElementById('btnExport').style.display = inScout ? '' : 'none';
+  document.getElementById('btnPrint').style.display = inScout ? '' : 'none';
+  document.getElementById('btnImport').style.display = inScout ? '' : 'none';
+  // Mostrar btnViewAI só se há histórico
+  if (inScout) {
+    const g = db.teams[currentTeamId]?.games[currentGameId];
+    document.getElementById('btnViewAI').style.display = g?.aiHistory?.length ? '' : 'none';
+  } else {
+    document.getElementById('btnViewAI').style.display = 'none';
+  }
+}
+function goHome() { sharedContext = null; setHash('#/'); showView('home'); renderHome(); renderSharedSection(); }
+function goTeam() { if(currentTeamId) { openTeam(currentTeamId); } }
+
+// ── MODALS ──
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ════════════════════════════════════
+// HOME
+// ════════════════════════════════════
+function renderHome() {
+  const c = document.getElementById('teamsContainer');
+  const teams = Object.values(db.teams);
+  if (!teams.length) {
+    c.innerHTML = '<div class="empty-home"><div>Nenhum time cadastrado</div>Clique em "+ Novo Time" para começar</div>';
+    return;
+  }
+  const html = '<div class="teams-grid">' + teams.map(t => {
+    const games = Object.values(t.games || {});
+    const pills = games.map(g =>
+      `<span class="game-pill" onclick="event.stopPropagation();openGame('${t.id}','${g.id}')">${g.name}</span>`
+    ).join('');
+    return `<div class="team-card" onclick="openTeam('${t.id}')">
+      <button class="team-card-del" onclick="event.stopPropagation();deleteTeam('${t.id}')">×</button>
+      <div class="team-card-name">${t.name}</div>
+      <div class="team-card-meta">${t.league||''} · ${games.length} jogo${games.length!==1?'s':''}</div>
+      <div class="team-card-games">${pills||'<span style="color:#333;font-size:10px">Nenhum jogo ainda</span>'}</div>
+    </div>`;
+  }).join('') + '</div>';
+  c.innerHTML = html;
+}
+
+function openNewTeamModal() {
+  document.getElementById('newTeamName').value = '';
+  document.getElementById('newTeamLeague').value = '';
+  openModal('modalTeam');
+  setTimeout(() => document.getElementById('newTeamName').focus(), 60);
+}
+
+function createTeam() {
+  const name = document.getElementById('newTeamName').value.trim();
+  if (!name) { showToast('Informe o nome do time.', 'error'); return; }
+  const id = 'team_' + Date.now();
+  db.teams[id] = { id, name, league: document.getElementById('newTeamLeague').value.trim(), games: {} };
+  saveDB();
+  closeModal('modalTeam');
+  showToast(`Time “${name}” criado.`, 'success');
+  openTeam(id);
+}
+
+function deleteTeam(id) {
+  showConfirm('Excluir este time e todos os seus jogos?', () => {
+    delete db.teams[id]; saveDB(); renderHome();
+    showToast('Time excluído.', 'warning');
+  });
+}
+
+// ════════════════════════════════════
+// TEAM VIEW
+// ════════════════════════════════════
+function openTeam(teamId) {
+  sharedContext = null;
+  currentTeamId = teamId;
+  const t = db.teams[teamId];
+  document.getElementById('bc-team-name').textContent = t.name;
+  document.getElementById('tvName').textContent = t.name;
+  document.getElementById('tvMeta').textContent = t.league || '';
+  // Botões para time próprio
+  document.getElementById('btnShareTeam').style.display = _firebaseDb && currentUser ? '' : 'none';
+  document.getElementById('btnNewGame').style.display = '';
+  document.getElementById('btnDeleteTeam').style.display = '';
+  renderTeamDashboard();
+  renderGames();
+  showView('team');
+  setHash(`#/team/${teamId}`);
+}
+
+function renderGames() {
+  const t = db.teams[currentTeamId];
+  const games = getSortedGames(Object.values(t.games || {}));
+  const c = document.getElementById('gamesContainer');
+  if (!games.length) {
+    c.innerHTML = '<div style="padding:40px 28px;color:var(--muted);font-size:11px;letter-spacing:2px">Nenhum jogo cadastrado — clique em "+ Novo Jogo"</div>';
+    return;
+  }
+  c.innerHTML = '<div class="games-grid">' + games.map(g => {
+    const p = g.plays || [];
+    const passes = p.filter(x => x.type==='Passe').length;
+    const runs = p.filter(x => x.type==='Corrida').length;
+    const hasScore = g.scoreUs !== undefined && g.scoreUs !== '' && g.scoreThem !== undefined && g.scoreThem !== '';
+    const scoreStr = hasScore ? `<span style="color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px">${g.scoreUs} \u00d7 ${g.scoreThem}</span>` : '';
+    return `<div class="game-card" onclick="openGame('${currentTeamId}','${g.id}')">
+      <button class="game-card-del" onclick="event.stopPropagation();deleteGame('${currentTeamId}','${g.id}')">×</button>
+      <div class="game-card-name">${g.name}</div>
+      <div class="game-card-meta">${g.phase||''} ${g.date?'\u00b7 '+g.date:''}</div>
+      <div class="game-card-stats">
+        <span style="color:var(--accent)">${p.length} jogadas</span>
+        <span style="color:#ff4d00">${passes} passes</span>
+        <span style="color:#4d88ff">${runs} corridas</span>
+        ${scoreStr}
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function openNewGameModal() {
+  document.getElementById('newGameName').value = '';
+  document.getElementById('newGameDate').value = '';
+  document.getElementById('newGamePhase').value = '';
+  openModal('modalGame');
+  setTimeout(() => document.getElementById('newGameName').focus(), 60);
+}
+
+function createGame() {
+  const name = document.getElementById('newGameName').value.trim();
+  if (!name) { showToast('Informe a identificação do jogo.', 'error'); return; }
+  const id = 'game_' + Date.now();
+  db.teams[currentTeamId].games[id] = {
+    id, name,
+    date: document.getElementById('newGameDate').value,
+    phase: document.getElementById('newGamePhase').value,
+    link: '', plays: []
+  };
+  saveDB();
+  closeModal('modalGame');
+  showToast(`Jogo “${name}” criado.`, 'success');
+  openGame(currentTeamId, id);
+}
+
+function deleteCurrentTeam() {
+  showConfirm('Excluir este time e todos os seus jogos?', () => {
+    delete db.teams[currentTeamId]; currentTeamId=null; saveDB(); goHome();
+    showToast('Time excluído.', 'warning');
+  });
+}
+
+function deleteGame(teamId, gameId) {
+  showConfirm('Excluir este jogo?', () => {
+    delete db.teams[teamId].games[gameId]; saveDB(); renderGames();
+    showToast('Jogo excluído.', 'warning');
+  });
+}
+
+// ════════════════════════════════════
+// SCOUT VIEW
+// ════════════════════════════════════
+function openGame(teamId, gameId) {
+  currentTeamId = teamId;
+  currentGameId = gameId;
+  const t = db.teams[teamId];
+  const g = t.games[gameId];
+
+  if (!g.modality) {
+    document.getElementById('bc-mod-team').textContent = t.name;
+    document.getElementById('bc-mod-game').textContent = g.name;
+    document.getElementById('modTeamName').textContent = t.name;
+    document.getElementById('modGameTitle').textContent = g.name;
+    document.getElementById('modalitySelect').value = '';
+    document.getElementById('modError').textContent = '';
+    showView('modality');
+    setHash(`#/team/${teamId}/game/${gameId}`);
+    return;
+  }
+  _openScoutView();
+}
+
+function confirmModality() {
+  const sel = document.getElementById('modalitySelect').value;
+  if (!sel) { document.getElementById('modError').textContent = 'Selecione uma modalidade para continuar.'; return; }
+  db.teams[currentTeamId].games[currentGameId].modality = sel;
+  saveDB();
+  _openScoutView();
+}
+
+function changeModality() {
+  const t = db.teams[currentTeamId];
+  const g = t?.games[currentGameId];
+  if (!t || !g) return;
+  document.getElementById('bc-mod-team').textContent = t.name;
+  document.getElementById('bc-mod-game').textContent = g.name;
+  document.getElementById('modTeamName').textContent = t.name;
+  document.getElementById('modGameTitle').textContent = g.name;
+  document.getElementById('modalitySelect').value = g.modality || '';
+  document.getElementById('modError').textContent = '';
+  showView('modality');
+}
+
+function _openScoutView() {
+  const t = db.teams[currentTeamId];
+  const g = t.games[currentGameId];
+  document.getElementById('bc-scout-team').textContent = t.name;
+  document.getElementById('bc-scout-game').textContent = g.name;
+  document.getElementById('gamePhase').value = g.phase || '';
+  document.getElementById('gameDate').value = g.date || '';
+  document.getElementById('gameLink').value = g.link || '';
+  document.getElementById('scoreUs').value = g.scoreUs || '';
+  document.getElementById('scoreThem').value = g.scoreThem || '';
+  document.getElementById('gameNotes').value = g.notes || '';
+  const badge = document.getElementById('gameModalityBadge');
+  const modText = document.getElementById('gameModalityText');
+  if (g.modality) { badge.style.display = ''; modText.textContent = g.modality; }
+  else { badge.style.display = 'none'; }
+  toggleLinkBtn();
+  document.getElementById('aiPanel').classList.remove('visible');
+  // Notes: auto-expand if has content
+  _notesExpanded = !!(g.notes && g.notes.trim());
+  document.getElementById('notesBody').style.display = _notesExpanded ? '' : 'none';
+  document.getElementById('notesToggleBtn').textContent = _notesExpanded ? '▼ recolher' : '▶ expandir';
+  // Remove old AI history panel so it re-renders fresh
+  document.getElementById('aiHistorySection')?.remove();
+  _currentPage = 1;
+  _showOnlyFlagged = false;
+  const flagBtn = document.getElementById('btnFlagFilter');
+  if (flagBtn) { flagBtn.style.borderColor='var(--muted)'; flagBtn.style.color='var(--muted)'; flagBtn.style.background=''; }
+  initFilterOptions();
+  renderTable();
+  renderCharts();
+  if (g.aiHistory?.length) renderAIHistory();
+  showView('scout');
+  setHash(`#/team/${currentTeamId}/game/${currentGameId}`);
+}
+
+function saveGame() {
+  if (!currentTeamId || !currentGameId) return;
+  const g = db.teams[currentTeamId].games[currentGameId];
+  g.phase = document.getElementById('gamePhase').value;
+  g.date  = document.getElementById('gameDate').value;
+  g.link  = document.getElementById('gameLink').value;
+  g.scoreUs   = document.getElementById('scoreUs').value;
+  g.scoreThem = document.getElementById('scoreThem').value;
+  g.notes = document.getElementById('gameNotes').value;
+  saveDB();
+}
+
+function deleteCurrentGame() {
+  showConfirm('Excluir este jogo e todas as jogadas?', () => {
+    delete db.teams[currentTeamId].games[currentGameId]; currentGameId=null; saveDB(); openTeam(currentTeamId);
+    showToast('Jogo excluído.', 'warning');
+  });
+}
+
+// ════════════════════════════════════
+// PLAYS
+// ════════════════════════════════════
+function newPlay(data = {}) {
+  return {
+    id: Date.now() + Math.random(),
+    quarter: data.quarter||'', yardLine: data.yardLine||'',
+    down: data.down||'', distance: data.distance||'',
+    personnel: data.personnel||'', type: data.type||'', runType: data.runType||'',
+    formation: data.formation||'', hash: data.hash||'',
+    defFormation: data.defFormation||'', coverage: data.coverage||'',
+    pressure: data.pressure||'', route: data.route||'',
+    result: data.result||'', yards: data.yards||'',
+    fieldZone: data.fieldZone||'', obs: data.obs||'',
+    flagged: data.flagged||false
+  };
+}
+
+function addRow() {
+  db.teams[currentTeamId].games[currentGameId].plays.push(newPlay());
+  saveDB();
+  renderTable();
+  setTimeout(() => {
+    const rows = document.querySelectorAll('#tableBody tr');
+    if (rows.length) rows[rows.length-1].scrollIntoView({behavior:'smooth',block:'nearest'});
+  }, 50);
+}
+
+function deleteRow(id) {
+  const p = db.teams[currentTeamId].games[currentGameId].plays;
+  const i = p.findIndex(x => x.id === id);
+  if (i === -1) return;
+  const [deleted] = p.splice(i, 1);
+  saveDB();
+  renderTable();
+  renderCharts();
+  const t = showToast('Jogada excluída. <button class="toast-undo" id="undoDelBtn">Desfazer</button>', 'info', 5000);
+  if (t) t.querySelector('#undoDelBtn').onclick = () => {
+    p.splice(i, 0, deleted); saveDB(); renderTable(); renderCharts();
+    t.remove(); showToast('Jogada restaurada.', 'success', 2000);
+  };
+}
+
+function autoFillNextDistance(idx, playsArr) {
+  if (idx >= playsArr.length - 1) return;
+  const cur  = playsArr[idx];
+  const next = playsArr[idx + 1];
+  const yards  = parseFloat(cur.yards) || 0;
+  const dist   = parseFloat(cur.distance) || 10;
+  const result = cur.result;
+  const curDown = cur.down;
+
+  let nextDist, nextDown;
+  if (result === 'Conversão' || result === 'Touchdown') {
+    nextDist = '10'; nextDown = '1º Down';
+  } else if (result === 'Incompleto') {
+    nextDist = String(dist);
+    // mesmo down aumenta
+    const dIdx = DOWN.indexOf(curDown);
+    nextDown = dIdx >= 0 && dIdx < DOWN.length-2 ? DOWN[dIdx+1] : '';
+  } else if (result === 'Interceptação' || result === 'Fumble' || result === 'Punt') {
+    nextDist = ''; nextDown = '1º Down';
+  } else {
+    const remaining = dist - yards;
+    if (remaining <= 0) {
+      nextDist = '10'; nextDown = '1º Down';
+    } else {
+      nextDist = String(Math.round(remaining));
+      const dIdx = DOWN.indexOf(curDown);
+      nextDown = dIdx >= 0 && dIdx < DOWN.length-2 ? DOWN[dIdx+1] : '';
+    }
+  }
+
+  if (next.distance !== nextDist) {
+    next.distance = nextDist;
+    const el = document.querySelector(`input[data-play-id="${next.id}"][data-field="distance"]`);
+    if (el) el.value = nextDist;
+  }
+  if (nextDown && next.down !== nextDown) {
+    next.down = nextDown;
+    const sel = document.querySelector(`select[data-play-id="${next.id}"][data-field="down"]`);
+    if (sel) sel.value = nextDown;
+  }
+}
+
+function updatePlay(id, field, value) {
+  const playsArr = db.teams[currentTeamId].games[currentGameId].plays;
+  const idx = playsArr.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  playsArr[idx][field] = value;
+  if (field === 'yards' || field === 'result') autoFillNextDistance(idx, playsArr);
+  updateStats();
+  saveDB();
+}
+
+function mkSel(options, val, id, field) {
+  const s = document.createElement('select');
+  s.dataset.playId = id; s.dataset.field = field;
+  const e = document.createElement('option'); e.value=''; e.textContent='—'; s.appendChild(e);
+  options.forEach(o => { const op = document.createElement('option'); op.value=o; op.textContent=o; if(o===val) op.selected=true; s.appendChild(op); });
+  s.onchange = () => updatePlay(id, field, s.value);
+  return s;
+}
+function mkInp(val, id, field, ph='') {
+  const i = document.createElement('input');
+  i.type = field==='yards'?'number':'text'; i.value=val; i.placeholder=ph;
+  i.dataset.playId = id; i.dataset.field = field;
+  i.oninput = () => updatePlay(id, field, i.value);
+  return i;
+}
+function mkTd(...children) { const td = document.createElement('td'); children.forEach(c => td.appendChild(c)); return td; }
+
+// ── PAGINATION ──
+const PAGE_SIZE = 50;
+let _currentPage = 1;
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  const allPlays = db.teams[currentTeamId]?.games[currentGameId]?.plays || [];
+  if (!allPlays.length) {
+    const tr = document.createElement('tr'); tr.className='empty-row';
+    tr.innerHTML='<td colspan="20">Nenhuma jogada registrada — clique em "+ Nova Jogada"</td>';
+    tbody.appendChild(tr); updateStats(); renderCharts();
+    document.getElementById('paginationBar').style.display='none'; return;
+  }
+  const filtered = getFilteredPlays(allPlays);
+  const sorted = getSortedPlays(filtered);
+  if (!sorted.length) {
+    const tr = document.createElement('tr'); tr.className='empty-row';
+    tr.innerHTML='<td colspan="20">Nenhuma jogada corresponde aos filtros ativos.</td>';
+    tbody.appendChild(tr); updateStats(); renderCharts();
+    document.getElementById('paginationBar').style.display='none'; return;
+  }
+
+  // Pagination
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  if (_currentPage > totalPages) _currentPage = totalPages;
+  const start = (_currentPage-1)*PAGE_SIZE;
+  const pageSlice = sorted.slice(start, start+PAGE_SIZE);
+
+  const modality = db.teams[currentTeamId]?.games[currentGameId]?.modality || '';
+  const isFullPad = modality === 'Full Pad';
+  const is9x9 = modality === '9x9';
+  const RESULT = getResult(modality);
+  const DEFORM = getDefFormation(modality);
+  const COV = getCoverage(modality);
+
+  // Mostrar/ocultar colunas condicionais nos headers
+  const thHash = document.getElementById('th-hash');
+  const thZone = document.getElementById('th-fieldZone');
+  if (thHash) thHash.style.display = isFullPad ? '' : 'none';
+  if (thZone) thZone.style.display = is9x9 ? '' : 'none';
+  // Mostrar/ocultar nas filter rows
+  const fHashTh = document.getElementById('fHash')?.closest('th');
+  const fZoneTh = document.getElementById('fZone')?.closest('th');
+  if (fHashTh) fHashTh.style.display = isFullPad ? '' : 'none';
+  if (fZoneTh) fZoneTh.style.display = is9x9 ? '' : 'none';
+
+  pageSlice.forEach((play) => {
+    const tr = document.createElement('tr');
+    if (play.flagged) tr.classList.add('flagged-row');
+    const numTd = document.createElement('td'); numTd.textContent = allPlays.indexOf(play) + 1;
+
+    // Flag button
+    const flagTd = document.createElement('td');
+    const flagBtn = document.createElement('button');
+    flagBtn.className = 'flag-btn' + (play.flagged ? ' flagged' : '');
+    flagBtn.textContent = '★'; flagBtn.title = play.flagged ? 'Remover destaque' : 'Destacar jogada';
+    flagBtn.onclick = () => toggleFlag(play.id);
+    flagTd.appendChild(flagBtn);
+
+    const actTd = document.createElement('td');
+    const dupBtn = document.createElement('button'); dupBtn.className='dup-btn'; dupBtn.title='Duplicar'; dupBtn.innerHTML='⧉'; dupBtn.onclick=()=>duplicateRow(play.id);
+    const delBtn = document.createElement('button'); delBtn.className='del-btn'; delBtn.textContent='×'; delBtn.title='Excluir'; delBtn.onclick=()=>deleteRow(play.id);
+    actTd.appendChild(dupBtn); actTd.appendChild(delBtn);
+
+    const cells = [
+      numTd,
+      flagTd,
+      mkTd(mkSel(QUARTER, play.quarter, play.id,'quarter')),
+      mkTd(mkInp(play.yardLine, play.id, 'yardLine','1-99')),
+      mkTd(mkSel(DOWN,   play.down,        play.id,'down')),
+      mkTd(mkInp(play.distance, play.id,   'distance','ex: 10')),
+      mkTd(mkSel(PERSONNEL, play.personnel, play.id,'personnel')),
+      mkTd(mkSel(TYPE,   play.type,        play.id,'type')),
+      mkTd(mkSel(RUN_TYPE, play.runType,   play.id,'runType')),
+      mkTd(mkInp(play.formation, play.id,  'formation','ex: Trips Dir.')),
+      ...(isFullPad ? [mkTd(mkSel(HASH, play.hash, play.id,'hash'))] : []),
+      mkTd(mkSel(DEFORM, play.defFormation, play.id,'defFormation')),
+      mkTd(mkSel(COV, play.coverage,  play.id,'coverage')),
+      mkTd(mkSel(PRESSURE, play.pressure,  play.id,'pressure')),
+      mkTd(mkInp(play.route, play.id,      'route','ex: Slant #1')),
+      mkTd(mkSel(RESULT, play.result,      play.id,'result')),
+      mkTd(mkInp(play.yards, play.id,      'yards','0')),
+      ...(is9x9 ? [mkTd(mkSel(FIELD_ZONE, play.fieldZone, play.id,'fieldZone'))] : []),
+      mkTd(mkInp(play.obs, play.id,        'obs','observação...')),
+      actTd
+    ];
+    cells.forEach(td => tr.appendChild(td));
+    tbody.appendChild(tr);
+  });
+  updateStats();
+  renderCharts();
+  updateSortHeaders();
+  updateFilterBadge();
+  // Filtered count badge
+  const badge = document.getElementById('playCountBadge');
+  if (badge) {
+    const hasFilter = Object.keys(activeFilters).length > 0 || _showOnlyFlagged;
+    if (hasFilter && sorted.length < allPlays.length) {
+      badge.textContent = `${sorted.length} de ${allPlays.length}`;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  renderPaginationBar(sorted.length, totalPages);
+}
+
+function updateFilterBadge() {
+  const count = Object.keys(activeFilters).length;
+  const badge = document.getElementById('filterBadge');
+  if (badge) { badge.textContent = count; badge.style.display = count > 0 ? 'flex' : 'none'; }
+}
+
+function renderPaginationBar(total, totalPages) {
+  const bar = document.getElementById('paginationBar');
+  if (!bar) return;
+  if (totalPages <= 1) { bar.style.display='none'; return; }
+  bar.style.display='flex';
+  let html = `<span class="page-info">${total} jogadas — pág. ${_currentPage}/${totalPages}</span>`;
+  for (let i=1;i<=totalPages;i++) {
+    html += `<button class="page-btn${_currentPage===i?' active':''}" onclick="goToPage(${i})">${i}</button>`;
+  }
+  bar.innerHTML = html;
+}
+
+function goToPage(n) { _currentPage = n; renderTable(); }
+
+function toggleFlag(id) {
+  const p = db.teams[currentTeamId].games[currentGameId].plays;
+  const play = p.find(x=>x.id===id); if(!play) return;
+  play.flagged = !play.flagged;
+  saveDB();
+  renderTable();
+  showToast(play.flagged ? '★ Jogada destacada.' : 'Destaque removido.', 'info', 2000);
+}
+
+// ── SORT GAMES ──
+let _gamesSortField = 'date';
+
+function setGamesSort(field) {
+  _gamesSortField = field;
+  ['gSortDate','gSortName','gSortPhase','gSortPlays'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.classList.remove('active');
+  });
+  const map = {date:'gSortDate',name:'gSortName',phase:'gSortPhase',plays:'gSortPlays'};
+  const el = document.getElementById(map[field]); if(el) el.classList.add('active');
+  renderGames();
+}
+
+function getSortedGames(gamesArr) {
+  return [...gamesArr].sort((a,b) => {
+    if (_gamesSortField === 'date') return (a.date||'').localeCompare(b.date||'');
+    if (_gamesSortField === 'name') return (a.name||'').localeCompare(b.name||'','pt-BR');
+    if (_gamesSortField === 'phase') {
+      const order = ['Fase de grupos','Quartas','Semi','Final','Amistoso'];
+      return order.indexOf(a.phase||'')-order.indexOf(b.phase||'');
+    }
+    if (_gamesSortField === 'plays') return (b.plays||[]).length-(a.plays||[]).length;
+    return 0;
+  });
+}
+
+function updateStats() {
+  const p = db.teams[currentTeamId]?.games[currentGameId]?.plays || [];
+  document.getElementById('statTotal').textContent = p.length;
+  document.getElementById('statPass').textContent  = p.filter(x=>x.type==='Passe').length;
+  document.getElementById('statRun').textContent   = p.filter(x=>x.type==='Corrida').length;
+  document.getElementById('statConv').textContent  = p.filter(x=>x.result==='Conversão'||x.result==='Touchdown').length;
+  document.getElementById('statTurn').textContent  = p.filter(x=>x.result==='Interceptação'||x.result==='Fumble'||x.type==='Turnover').length;
+  const withYards = p.filter(x => x.yards !== '' && !isNaN(parseFloat(x.yards)));
+  const avgY = withYards.length ? (withYards.reduce((s,x)=>s+parseFloat(x.yards),0)/withYards.length).toFixed(1) : '0.0';
+  document.getElementById('statAvgYards').textContent = avgY;
+}
+
+// ── LINK ──
+function toggleLinkBtn() {
+  document.getElementById('openLinkBtn').style.display = document.getElementById('gameLink').value.trim() ? '' : 'none';
+}
+function openGameLink() { const l=document.getElementById('gameLink').value.trim(); if(l) window.open(l,'_blank'); }
+
+// ── CSV ──
+function exportCSV() {
+  const p = db.teams[currentTeamId]?.games[currentGameId]?.plays || [];
+  if (!p.length) { showToast('Nenhuma jogada para exportar.', 'warning'); return; }
+  const t = db.teams[currentTeamId]; const g = t.games[currentGameId];
+  const headers = ['#','Q','Yard Line','Down','Distância','Personnel','Tipo','T. Corrida','Formação Off.','Hash','Formação Def.','Coverage','Pressão','Conceito/Rota','Resultado','Metros','Pos. Final','Obs','Destaque'];
+  const rows = p.map((x,i) => [i+1,x.quarter||'',x.yardLine||'',x.down,x.distance,x.personnel||'',x.type,x.runType||'',x.formation,x.hash||'',x.defFormation,x.coverage,x.pressure||'',x.route,x.result,x.yards,x.fieldZone,x.obs,x.flagged?'sim':'']);
+  const csv = [headers,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`panda_${t.name.replace(/\s+/g,'_')}_${g.name.replace(/\s+/g,'_')}.csv`; a.click();
+}
+
+// ── SAVE INDICATOR ──
+let _saveTimer = null;
+function showSaveIndicator(state) {
+  const el = document.getElementById('saveIndicator'); if(!el) return;
+  clearTimeout(_saveTimer);
+  el.className = state; // 'saving' or 'saved'
+  el.textContent = state === 'saving' ? '● Salvando...' : '✓ Salvo';
+  if (state === 'saved') _saveTimer = setTimeout(() => { el.style.opacity='0'; }, 2000);
+}
+
+// ── PRINT ──
+function printScout() {
+  window.print();
+}
+
+// ── VIEW LAST AI ──
+function viewLastAI() {
+  const g = db.teams[currentTeamId]?.games[currentGameId];
+  if (!g?.aiHistory?.length) { showToast('Nenhuma análise salva para este jogo.', 'warning'); return; }
+  const h = g.aiHistory[0];
+  const t = db.teams[currentTeamId];
+  document.getElementById('viewAIGameLabel').textContent = `${t.name} — ${g.name} | ${h.label} | ${h.date}`;
+  document.getElementById('viewAIContent').textContent = h.text || '';
+  openModal('modalViewAI');
+}
+
+function downloadLastAI() {
+  const g = db.teams[currentTeamId]?.games[currentGameId];
+  if (!g?.aiHistory?.length) return;
+  const h = g.aiHistory[0];
+  const t = db.teams[currentTeamId];
+  const html = generateWordDoc(h.text, t.name, g.name, h.type);
+  downloadWordDoc(html, t.name, g.name);
+}
+
+function copyAIText() {
+  const text = document.getElementById('viewAIContent').textContent || '';
+  if (!text) return;
+  navigator.clipboard.writeText(text)
+    .then(() => { showToast('Texto copiado para a área de transferência.', 'success', 2500); })
+    .catch(() => { showToast('Não foi possível copiar — tente selecionar e copiar manualmente.', 'warning'); });
+}
+
+// ── COMPARE GAMES ──
+function openCompareModal() {
+  if (!currentTeamId) return;
+  const games = Object.values(db.teams[currentTeamId]?.games || {});
+  const selA = document.getElementById('compareSelA');
+  const selB = document.getElementById('compareSelB');
+  selA.innerHTML = '<option value="">— Jogo A —</option>';
+  selB.innerHTML = '<option value="">— Jogo B —</option>';
+  games.forEach(g => {
+    selA.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+    selB.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+  });
+  document.getElementById('compareBody').innerHTML = '<div class="compare-empty">Selecione dois jogos para comparar.</div>';
+  openModal('modalCompare');
+}
+
+function renderCompare() {
+  const idA = document.getElementById('compareSelA').value;
+  const idB = document.getElementById('compareSelB').value;
+  const body = document.getElementById('compareBody');
+  if (!idA || !idB || idA === idB) { body.innerHTML = '<div class="compare-empty">Selecione dois jogos diferentes.</div>'; return; }
+  const gA = db.teams[currentTeamId]?.games[idA];
+  const gB = db.teams[currentTeamId]?.games[idB];
+  if (!gA || !gB) { body.innerHTML = '<div class="compare-empty">Dados não encontrados.</div>'; return; }
+
+  function calcStats(g) {
+    const p = g.plays || [];
+    const total = p.length;
+    const passes = p.filter(x=>x.type==='Passe').length;
+    const corridas = p.filter(x=>x.type==='Corrida').length;
+    const convs = p.filter(x=>x.result==='Conversão'||x.result==='Touchdown').length;
+    const turnovers = p.filter(x=>x.result==='Interceptação'||x.result==='Fumble'||x.type==='Turnover').length;
+    const in3d = p.filter(x=>x.down==='3º Down');
+    const conv3d = in3d.filter(x=>x.result==='Conversão'||x.result==='Touchdown').length;
+    const withYards = p.filter(x=>x.yards!==''&&!isNaN(parseFloat(x.yards)));
+    const avgY = withYards.length ? (withYards.reduce((s,x)=>s+parseFloat(x.yards),0)/withYards.length).toFixed(1) : '0.0';
+    const topCov = COVERAGE.map(c=>({c,n:p.filter(x=>x.coverage===c).length})).sort((a,b)=>b.n-a.n)[0];
+    return { total, passes, corridas, convs, turnovers, conv3dPct: in3d.length?Math.round(conv3d/in3d.length*100):0, avgY, topCov };
+  }
+
+  const sA = calcStats(gA); const sB = calcStats(gB);
+  const metrics = [
+    ['Total Jogadas', sA.total, sB.total, 'higher'],
+    ['Passes', sA.passes, sB.passes, null],
+    ['Corridas', sA.corridas, sB.corridas, null],
+    ['% Passe', sA.total?Math.round(sA.passes/sA.total*100)+'%':'—', sB.total?Math.round(sB.passes/sB.total*100)+'%':'—', null],
+    ['Conversões', sA.convs, sB.convs, 'higher'],
+    ['% Conv. 3º Down', sA.conv3dPct+'%', sB.conv3dPct+'%', 'higher'],
+    ['Turnovers', sA.turnovers, sB.turnovers, 'lower'],
+    ['Méd. Metros/Jogada', sA.avgY, sB.avgY, 'higher'],
+    ['Cobertura +freq.', sA.topCov?.n?sA.topCov.c:'—', sB.topCov?.n?sB.topCov.c:'—', null],
+  ];
+  const scoreA = (gA.scoreUs!==undefined&&gA.scoreUs!=='')?`${gA.scoreUs}×${gA.scoreThem}`:'—';
+  const scoreB = (gB.scoreUs!==undefined&&gB.scoreUs!=='')?`${gB.scoreUs}×${gB.scoreThem}`:'—';
+
+  function buildCol(game, stats, otherStats, side, score) {
+    let rows = '';
+    metrics.forEach(([label, vA, vB, better]) => {
+      const v = side==='A' ? vA : vB;
+      const o = side==='A' ? vB : vA;
+      let isBetter = false;
+      if (better) {
+        const vn = parseFloat(String(v).replace('%',''));
+        const on = parseFloat(String(o).replace('%',''));
+        if (!isNaN(vn) && !isNaN(on)) {
+          isBetter = better === 'higher' ? vn > on : vn < on;
+        }
+      }
+      rows += `<div class="compare-stat-row"><span class="compare-stat-label">${label}</span><span class="compare-stat-val${isBetter?' better':''}">${v}${isBetter?' ▲':''}</span></div>`;
+    });
+    return `<div class="compare-col">
+      <div class="compare-col-title">${game.name}</div>
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:8px">${game.phase||''} ${game.date?'· '+game.date:''} · Placar: ${score}</div>
+      ${rows}
+    </div>`;
+  }
+
+  body.innerHTML = `<div class="compare-grid">${buildCol(gA,sA,sB,'A',scoreA)}${buildCol(gB,sB,sA,'B',scoreB)}</div>`;
+}
+
+// ── IMPORT ──
+function openImportModal() {
+  document.getElementById('importStatus').textContent = '';
+  document.getElementById('importStatus').style.color = '';
+  openModal('modalImport');
+}
+
+function handleImportDrop(e) {
+  e.preventDefault();
+  document.getElementById('importDropzone').classList.remove('drag-over');
+  const file = e.dataTransfer?.files?.[0];
+  if (file) handleImportFile(file);
+}
+
+async function handleImportFile(file) {
+  const statusEl = document.getElementById('importStatus');
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  statusEl.textContent = 'Processando...';
+  statusEl.style.color = 'var(--muted)';
+  try {
+    const text = await file.text();
+    if (ext === 'json') {
+      const parsed = JSON.parse(text);
+      // Aceita {teams:{...}} ou o objeto data direto
+      const data = parsed.teams ? parsed : (parsed.data?.teams ? parsed.data : null);
+      if (!data || !data.teams) { statusEl.textContent = '⚠ Arquivo JSON inválido — estrutura não reconhecida.'; statusEl.style.color='var(--danger)'; return; }
+      showConfirm('Substituir TODOS os dados atuais pelos do arquivo importado?', async () => {
+        db = data;
+        saveDB();
+        closeModal('modalImport');
+        renderHome();
+        showToast('✓ Backup restaurado com sucesso.', 'success', 4000);
+      }, 'Importar', true);
+    } else if (ext === 'csv') {
+      if (!currentTeamId || !currentGameId) { statusEl.textContent = '⚠ Abra um jogo antes de importar CSV de jogadas.'; statusEl.style.color='var(--danger)'; return; }
+      const lines = text.trim().split('\n').slice(1); // pula header
+      let count = 0;
+      lines.forEach(line => {
+        const cols = line.split(',').map(c => c.replace(/^"|"$/g,'').trim());
+        if (cols.length < 4) return;
+        // tenta mapear: #,Q,YardLine,Down,Dist,Personnel,Tipo,TipoCorr,FormOff,Hash,FormDef,Cov,Press,Rota,Result,Yards,Zone,Obs
+        const play = newPlay({
+          quarter: cols[1]||'', yardLine: cols[2]||'', down: cols[3]||'', distance: cols[4]||'',
+          personnel: cols[5]||'', type: cols[6]||'', runType: cols[7]||'', formation: cols[8]||'',
+          hash: cols[9]||'', defFormation: cols[10]||'', coverage: cols[11]||'', pressure: cols[12]||'',
+          route: cols[13]||'', result: cols[14]||'', yards: cols[15]||'', fieldZone: cols[16]||'', obs: cols[17]||''
+        });
+        db.teams[currentTeamId].games[currentGameId].plays.push(play);
+        count++;
+      });
+      if (!count) { statusEl.textContent = '⚠ Nenhuma linha válida encontrada no CSV.'; statusEl.style.color='var(--danger)'; return; }
+      saveDB();
+      renderTable();
+      closeModal('modalImport');
+      showToast(`✓ ${count} jogadas importadas.`, 'success', 4000);
+    } else {
+      statusEl.textContent = '⚠ Formato não suportado. Use .json ou .csv.';
+      statusEl.style.color = 'var(--danger)';
+    }
+  } catch(e) {
+    notifyErrorToAdmin('importar arquivo', e);
+    statusEl.textContent = '⚠ Erro ao processar arquivo. O administrador foi notificado.';
+    statusEl.style.color = 'var(--danger)';
+  }
+}
+
+function exportFullBackup() {
+  const data = JSON.stringify(db, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `panda_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ── ADMIN REALTIME PENDING BADGE ──
+let _pendingListener = null;
+function startAdminPendingListener() {
+  if (!_firebaseDb || currentUserRole !== 'admin') return;
+  if (_pendingListener) return; // já ativo
+  _pendingListener = _firebaseDb.collection('userProfiles')
+    .where('approved', '==', false)
+    .onSnapshot(snap => {
+      const count = snap.docs.filter(d => d.data().role !== 'admin').length;
+      const badge = document.getElementById('adminPendingBadge');
+      if (badge) {
+        badge.textContent = count > 0 ? String(count) : '';
+        badge.style.display = count > 0 ? 'inline' : 'none';
+      }
+    }, () => {});
+}
+
+// ── ADMIN FILTER ──
+let _adminStatusFilter = 'all';
+function setAdminFilter(filter) {
+  _adminStatusFilter = filter;
+  ['aFiltAll','aFiltApproved','aFiltPending','aFiltAdmin'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.classList.remove('active');
+  });
+  const map = {all:'aFiltAll',approved:'aFiltApproved',pending_only:'aFiltPending',admin:'aFiltAdmin'};
+  const el = document.getElementById(map[filter]); if(el) el.classList.add('active');
+  renderAdminUsers();
+}
+
+// ── AI CONFIG ──
+const TYPE_LABELS = {
+  terceiro_down: '3º Down',
+  posicao_final: 'Posição Final da Bola',
+  tendencias_ataque: 'Tendências de Ataque',
+  red_zone: 'Red Zone',
+  tendencias_defesa: 'Tendências de Defesa',
+  custom: 'Consulta Livre'
+};
+
+const FOCUS_INSTRUCTIONS = {
+  terceiro_down: 'Foque exclusivamente nas jogadas de 3º Down. Analise: % de conversão no 3º down, distribuição passe/corrida (%), rotas/conceitos mais usados e % de sucesso de cada um, formações ofensivas preferidas e quais coberturas defensivas foram encontradas nessa situação.',
+  posicao_final: 'Foque na posição final da bola após cada jogada. Analise: distribuição % por zona (Curto/Médio/Longo × Direita/Centro/Esquerda), quais zonas concentram mais jogadas, tipo de jogada (passe/corrida) preferido por zona (%), taxa de sucesso por zona (%), e onde o ataque é mais eficiente.',
+  tendencias_ataque: 'Analise os padrões ofensivos gerais. Foque em: % passe vs corrida no total e por down, formações ofensivas mais usadas (%), conceitos/rotas mais frequentes (%) e taxa de sucesso de cada um (%), down com maior % de conversão, e sequências de jogadas recorrentes.',
+  red_zone: 'Foque exclusivamente nas jogadas nas zonas Curto (Direita/Centro/Esquerda). Analise: % de TDs e conversões na Red Zone, tipo de jogada preferido (%), rotas/conceitos mais usados dentro da Red Zone (%), formações ofensivas usadas (%), e % de falhas (incompletos, perdas).',
+  tendencias_defesa: 'Analise os padrões defensivos do adversário. Foque em: coberturas mais usadas (% Cover 0/1/2/3/4), formações defensivas mais usadas (% 2DL/3DL/4DL/Blitz), cobertura preferida por down (%), qual cobertura o adversário usa contra passe vs corrida (%), e situações em que o Blitz aparece mais.'
+};
+
+function isAdminConfigAllowed() {
+  return currentUserRole === 'admin';
+}
+
+function getStoredApiKey() {
+  return localStorage.getItem('panda_groq_key') || '';
+}
+
+function openConfigModal() {
+  if (!isAdminConfigAllowed()) {
+    showToast('Apenas administradores podem alterar essa configuração.', 'error');
+    return;
+  }
+  document.getElementById('configApiKey').value = getStoredApiKey();
+  const raw = localStorage.getItem('panda_firebase_config') || '';
+  document.getElementById('configFirebase').value = raw;
+  const statusEl = document.getElementById('firebaseStatus');
+  if (raw) {
+    try {
+      const cfg = JSON.parse(raw);
+      statusEl.innerHTML = `<span style="color:var(--accent)">✓ Firebase configurado — projeto: <b>${cfg.projectId || '?'}</b></span>`;
+    } catch(e) {
+      statusEl.innerHTML = '<span style="color:var(--danger)">⚠ JSON inválido no config salvo</span>';
+    }
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--muted)">Firebase não configurado — usando localStorage</span>';
+  }
+  openModal('modalConfig');
+}
+
+async function saveApiKey() {
+  const isFirstSetup = !_firebaseAuth;
+  if (!isFirstSetup && !isAdminConfigAllowed()) {
+    showToast('Apenas administradores podem alterar essa configuração.', 'error');
+    return;
+  }
+  const key = document.getElementById('configApiKey').value.trim();
+  const fbRaw = document.getElementById('configFirebase').value.trim();
+  if (!key && !fbRaw) {
+    showToast('Informe a chave Groq ou a configuração Firebase.', 'error');
+    return;
+  }
+  if (key) localStorage.setItem('panda_groq_key', key);
+  if (fbRaw) {
+    try {
+      JSON.parse(fbRaw);
+      localStorage.setItem('panda_firebase_config', fbRaw);
+      // Salva no servidor para que outros dispositivos obtenham automaticamente
+      if (window.location.protocol !== 'file:') {
+        fetch('/api/firebase-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config: JSON.parse(fbRaw) })
+        }).catch(() => {});
+      }
+      _firebaseApp = null; _firebaseDb = null; _firebaseAuth = null; currentUser = null;
+      if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+        await Promise.all(firebase.apps.map(a => a.delete()));
+      }
+      await initFirebaseClient();
+    } catch(e) {
+      showToast('JSON Firebase inválido. Verifique o formato e tente novamente.', 'error');
+      return;
+    }
+  }
+  closeModal('modalConfig');
+  showToast('Configurações salvas.', 'success');
+}
+
+function openFirebaseSetup() {
+  document.getElementById('configApiKey').value = '';
+  document.getElementById('configFirebase').value = localStorage.getItem('panda_firebase_config') || '';
+  const statusEl = document.getElementById('firebaseStatus');
+  if (_firebaseAuth) {
+    statusEl.innerHTML = '<span style="color:var(--accent)">✓ Firebase conectado</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--accent2)">Firebase não configurado — cole o JSON abaixo para conectar</span>';
+  }
+  openModal('modalConfig');
+}
+
+function clearApiKey() {
+  if (!isAdminConfigAllowed()) {
+    showToast('Apenas administradores podem alterar essa configuração.', 'error');
+    return;
+  }
+  showConfirm('Remover a chave de API Groq salva?', () => {
+    localStorage.removeItem('panda_groq_key');
+    document.getElementById('configApiKey').value = '';
+    showToast('Chave Groq removida.', 'warning');
+  });
+}
+
+function clearFirebaseConfig() {
+  if (!isAdminConfigAllowed()) {
+    showToast('Apenas administradores podem alterar essa configuração.', 'error');
+    return;
+  }
+  showConfirm('Remover a configuração Firebase salva? Os dados locais não serão apagados.', () => {
+    localStorage.removeItem('panda_firebase_config');
+    _firebaseApp = null; _firebaseDb = null; _firebaseAuth = null; currentUser = null;
+    document.getElementById('configFirebase').value = '';
+    document.getElementById('firebaseStatus').innerHTML = '<span style="color:var(--muted)">Firebase removido — usando localStorage</span>';
+    showToast('Configuração Firebase removida.', 'warning');
+  });
+}
+
+function splitAIAnalysisOptions(text) {
+  const parts = text
+    .split(/\n(?=(?:Opção\s*[1-5]|[1-5][\.\-]))/g)
+    .map(part => part.trim())
+    .filter(Boolean);
+  return parts.length > 1 ? parts : [text.trim()];
+}
+
+function generateWordDoc(text, teamName, gameName, analysisType) {
+  const options = splitAIAnalysisOptions(text);
+  const focusLabel = TYPE_LABELS[analysisType] || analysisType;
+  const today = new Date().toLocaleDateString('pt-BR');
+
+  function escHtml(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function formatBlock(raw) {
+    return escHtml(raw)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+  }
+
+  let body = `
+    <h1 style="color:#1a3c5e;font-size:20pt;margin-bottom:4pt">P.A.N.D.A. — Análise Tática</h1>
+    <p style="color:#555;font-size:10pt;margin-bottom:16pt">
+      <b>Time adversário:</b> ${escHtml(teamName)}&nbsp;&nbsp;|&nbsp;&nbsp;
+      <b>Jogo:</b> ${escHtml(gameName)}&nbsp;&nbsp;|&nbsp;&nbsp;
+      <b>Foco:</b> ${escHtml(focusLabel)}&nbsp;&nbsp;|&nbsp;&nbsp;
+      <b>Data:</b> ${today}
+    </p>
+    <hr style="border:none;border-top:2px solid #1a3c5e;margin-bottom:18pt">`;
+
+  if (options.length > 1) {
+    options.forEach((opt, i) => {
+      body += `<h2 style="color:#2e6da4;font-size:14pt;border-bottom:1px solid #ccc;padding-bottom:4pt;margin-top:18pt">Opção ${i + 1}</h2>`;
+      body += `<p style="line-height:1.7;font-size:11pt">${formatBlock(opt)}</p>`;
+    });
+  } else {
+    body += `<p style="line-height:1.7;font-size:11pt">${formatBlock(text)}</p>`;
+  }
+
+  body += `<p style="margin-top:24pt;color:#aaa;font-size:9pt">Gerado por P.A.N.D.A. — Programa de Análise e Neutralização de Decisões Adversárias</p>`;
+
+  return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>PANDA Analise</title>
+<style>body{font-family:Calibri,Arial,sans-serif;margin:2cm 2.5cm;}</style></head>
+<body>${body}</body></html>`;
+}
+
+function downloadWordDoc(html, teamName, gameName) {
+  const blob = new Blob(['\uFEFF', html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `panda_analise_${teamName.replace(/\s+/g,'_')}_${gameName.replace(/\s+/g,'_')}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// ── AI INTERACTIVE DASHBOARD ──
+const DASH_COLORS = ['#c8f135','#ff4d00','#4d88ff','#f0c040','#a04dff','#ff3333','#33cccc','#ff80ab','#80cbc4','#b0bec5'];
+
+function renderAIDashboard(jsonData, teamName, gameName, focusLabel) {
+  const container = document.getElementById('aiOutput');
+  if (!container) return;
+  container.style.whiteSpace = 'normal';
+
+  let html = '<div class="ai-dash">';
+  // Header
+  html += `<div class="ai-dash-header">
+    <div class="ai-dash-title">📊 ${escHtmlDash(teamName)} — ${escHtmlDash(gameName)}</div>
+    <div class="ai-dash-meta">${escHtmlDash(focusLabel)} | ${new Date().toLocaleDateString('pt-BR')}</div>
+  </div>`;
+
+  // KPIs
+  if (jsonData.kpis && jsonData.kpis.length) {
+    html += '<div class="ai-dash-kpi-grid">';
+    jsonData.kpis.forEach(k => {
+      html += `<div class="ai-dash-kpi">
+        <div class="ai-dash-kpi-value">${escHtmlDash(String(k.valor))}</div>
+        <div class="ai-dash-kpi-label">${escHtmlDash(k.nome)}</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Charts grid
+  if (jsonData.graficos && jsonData.graficos.length) {
+    html += '<div class="ai-dash-grid">';
+    jsonData.graficos.forEach((g, gi) => {
+      html += `<div class="ai-dash-card">
+        <div class="ai-dash-card-title">${escHtmlDash(g.titulo)}</div>`;
+
+      if (g.tipo === 'pizza' || g.tipo === 'donut') {
+        html += renderDashDonut(g.dados, gi);
+      } else {
+        // Default: horizontal bar chart
+        html += renderDashBars(g.dados, gi);
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Insights / recommendations
+  if (jsonData.insights && jsonData.insights.length) {
+    html += '<div class="ai-dash-insight">';
+    html += '<div class="ai-dash-insight-title">💡 Recomendações Táticas</div>';
+    html += '<div class="ai-dash-insight-text">';
+    jsonData.insights.forEach((ins, i) => {
+      html += `${i > 0 ? '<br>' : ''}• ${escHtmlDash(ins)}`;
+    });
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+
+  // Animate bars after render
+  setTimeout(() => {
+    container.querySelectorAll('.ai-dash-bar-fill').forEach(bar => {
+      bar.style.width = bar.dataset.width;
+    });
+  }, 50);
+}
+
+function escHtmlDash(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderDashBars(dados, groupIdx) {
+  if (!dados || !dados.length) return '<div style="color:var(--muted);font-size:10px">Sem dados</div>';
+  const maxVal = Math.max(...dados.map(d => parseFloat(d.valor) || 0), 1);
+  let html = '<div class="ai-dash-bar-group">';
+  dados.forEach((d, i) => {
+    const pct = Math.min(((parseFloat(d.valor) || 0) / maxVal) * 100, 100);
+    const color = DASH_COLORS[i % DASH_COLORS.length];
+    const displayVal = String(d.valor).includes('%') ? d.valor : d.valor + '%';
+    html += `<div class="ai-dash-bar-row">
+      <div class="ai-dash-bar-label" title="${escHtmlDash(d.nome)}">${escHtmlDash(d.nome)}</div>
+      <div class="ai-dash-bar-track">
+        <div class="ai-dash-bar-fill" style="background:${color};width:0" data-width="${pct.toFixed(1)}%"></div>
+      </div>
+      <div class="ai-dash-bar-val">${escHtmlDash(displayVal)}</div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderDashDonut(dados, groupIdx) {
+  if (!dados || !dados.length) return '<div style="color:var(--muted);font-size:10px">Sem dados</div>';
+  const total = dados.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0) || 1;
+  const cx = 50, cy = 50, r = 40, inner = 22;
+  let paths = '', angle = -Math.PI / 2;
+  let legend = '';
+
+  dados.forEach((d, i) => {
+    const val = parseFloat(d.valor) || 0;
+    const a = (val / total) * 2 * Math.PI;
+    if (a < 0.001) return;
+    const color = DASH_COLORS[i % DASH_COLORS.length];
+    const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+    const x2 = cx + r * Math.cos(angle + a), y2 = cy + r * Math.sin(angle + a);
+    const ix1 = cx + inner * Math.cos(angle + a), iy1 = cy + inner * Math.sin(angle + a);
+    const ix2 = cx + inner * Math.cos(angle), iy2 = cy + inner * Math.sin(angle);
+    const large = a > Math.PI ? 1 : 0;
+    paths += `<path d="M${x1.toFixed(1)},${y1.toFixed(1)}A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)}L${ix1.toFixed(1)},${iy1.toFixed(1)}A${inner},${inner} 0 ${large},0 ${ix2.toFixed(1)},${iy2.toFixed(1)}Z" fill="${color}" opacity=".88"><title>${escHtmlDash(d.nome)}: ${Math.round(val/total*100)}%</title></path>`;
+    legend += `<div class="ai-dash-donut-item"><span class="ai-dash-donut-swatch" style="background:${color}"></span>${escHtmlDash(d.nome)} <span style="margin-left:auto;color:var(--text)">${Math.round(val/total*100)}%</span></div>`;
+    angle += a;
+  });
+
+  return `<div class="ai-dash-donut-wrap">
+    <svg viewBox="0 0 100 100" width="96" height="96">${paths}</svg>
+    <div class="ai-dash-donut-legend">${legend}</div>
+  </div>`;
+}
+
+function buildChartPrompt(teamName, gameName, playCount, summary, focusLabel, focusInstruction, customQuestion) {
+  const systemMsg = 'Você é um analista de futebol americano flag x9 brasileiro. Retorne APENAS um JSON válido, sem markdown, sem código, sem explicação. O JSON deve seguir exatamente a estrutura especificada. Todos os textos devem estar em português do Brasil.';
+
+  const jsonStructure = `{
+  "kpis": [
+    { "nome": "Nome do KPI", "valor": "67%" }
+  ],
+  "graficos": [
+    {
+      "titulo": "Título do gráfico",
+      "tipo": "barra",
+      "dados": [
+        { "nome": "Categoria", "valor": 67 }
+      ]
+    }
+  ],
+  "insights": [
+    "Primeira recomendação tática objetiva",
+    "Segunda recomendação tática objetiva"
+  ]
+}`;
+
+  const userMsg = `Analise o scout do time "${teamName}" — jogo "${gameName}" (${playCount} jogadas).
+
+FOCO: ${focusLabel}
+${focusInstruction}
+
+Retorne EXCLUSIVAMENTE um JSON válido com esta estrutura:
+${jsonStructure}
+
+REGRAS:
+- "kpis": 3 a 5 indicadores-chave com valores numéricos/percentuais extraídos dos dados
+- "graficos": 2 a 4 gráficos. Cada gráfico tem "titulo", "tipo" ("barra" ou "pizza"), e "dados" (array de objetos com "nome" e "valor" numérico)
+- "insights": 2 a 3 recomendações táticas curtas e objetivas baseadas nos dados
+- Todos os valores devem ser números concretos extraídos do scout
+- NÃO inclua texto fora do JSON, NÃO use markdown, NÃO adicione comentários
+${customQuestion ? `- Pergunta específica do analista: "${customQuestion}"` : ''}
+
+SCOUT:
+${summary}`;
+
+  return { systemMsg, userMsg };
+}
+
+function parseAIJsonResponse(text) {
+  // Remove markdown code fences if present
+  let clean = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+  // Remove any text before the first {
+  const firstBrace = clean.indexOf('{');
+  if (firstBrace > 0) clean = clean.substring(firstBrace);
+  // Remove any text after the last }
+  const lastBrace = clean.lastIndexOf('}');
+  if (lastBrace > 0) clean = clean.substring(0, lastBrace + 1);
+  return JSON.parse(clean);
+}
+
+async function analyzeWithAI() {
+  const p = db.teams[currentTeamId]?.games[currentGameId]?.plays || [];
+  if (!p.length) { showToast('Registre pelo menos algumas jogadas antes de analisar.', 'warning'); return; }
+
+  // Valida consulta livre
+  let customQuestion = '';
+  if (selectedAnalysisType === 'custom') {
+    customQuestion = (document.getElementById('aiCustomQuestion').value || '').trim();
+    if (!customQuestion) {
+      document.getElementById('aiCustomQuestion').focus();
+      document.getElementById('aiCustomQuestion').style.borderColor = 'var(--danger)';
+      setTimeout(() => { document.getElementById('aiCustomQuestion').style.borderColor = ''; }, 2000);
+      return;
+    }
+  }
+
+  const panel = document.getElementById('aiPanel');
+  const output = document.getElementById('aiOutput');
+  panel.classList.add('visible');
+  document.getElementById('aiTabs').innerHTML = '';
+  output.style.whiteSpace = selectedOutputMode === 'charts' ? 'normal' : 'pre-wrap';
+  output.innerHTML = '<div class="ai-loading"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span style="margin-left:8px">Gerando análise — aguarde...</span></div>';
+  panel.scrollIntoView({ behavior: 'smooth' });
+
+  const t = db.teams[currentTeamId];
+  const g = t.games[currentGameId];
+  const summary = p.map((x, i) =>
+    `Jogada ${i+1}: ${x.down} | Tipo: ${x.type} | Form.Off: ${x.formation} | Form.Def: ${x.defFormation} | Coverage: ${x.coverage} | Conceito/Rota: ${x.route} | Resultado: ${x.result} | Metros: ${x.yards} | Pos.Final: ${x.fieldZone} | Obs: ${x.obs}`
+  ).join('\n');
+
+  const isChartMode = selectedOutputMode === 'charts';
+  const focusLabel = selectedAnalysisType === 'custom' ? 'Consulta Livre' : (TYPE_LABELS[selectedAnalysisType] || 'Tendências de Ataque');
+  const focusInstruction = selectedAnalysisType === 'custom'
+    ? `Responda à seguinte pergunta/solicitação do analista, baseando-se exclusivamente nos dados do scout fornecido: "${customQuestion}". Use números e percentuais concretos extraídos dos dados. Se a pergunta não puder ser respondida com os dados disponíveis, explique o que falta.`
+    : (FOCUS_INSTRUCTIONS[selectedAnalysisType] || FOCUS_INSTRUCTIONS['tendencias_ataque']);
+
+  // Modo servidor: tenta /api/analyze primeiro
+  const useServer = window.location.protocol !== 'file:';
+
+  if (useServer) {
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamName: t.name,
+          gameName: g.name,
+          playCount: p.length,
+          summary,
+          analysisType: selectedAnalysisType,
+          customQuestion: customQuestion || undefined,
+          outputMode: selectedOutputMode
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.analysis || '';
+        if (!text) { output.innerHTML = '<span style="color:var(--danger)">Resposta vazia da IA.</span>'; return; }
+
+        if (isChartMode) {
+          try {
+            const jsonData = parseAIJsonResponse(text);
+            renderAIDashboard(jsonData, t.name, g.name, focusLabel);
+            const focusLabelSaved = selectedAnalysisType === 'custom' ? customQuestion.substring(0,30) : (TYPE_LABELS[selectedAnalysisType]||'');
+            saveAIHistory('[GRÁFICO] ' + JSON.stringify(jsonData).substring(0,200), selectedAnalysisType, '📊 ' + focusLabelSaved);
+            document.getElementById('btnViewAI').style.display = '';
+            return;
+          } catch(parseErr) {
+            output.innerHTML = '<span style="color:var(--danger)">Erro ao interpretar dados para gráficos. Tente novamente ou use o modo Doc.</span>';
+            notifyErrorToAdmin('analyzeWithAI-charts-parse', parseErr);
+            return;
+          }
+        }
+
+        const focusLabelSaved = selectedAnalysisType === 'custom' ? customQuestion.substring(0,30) : (TYPE_LABELS[selectedAnalysisType]||'');
+        saveAIHistory(text, selectedAnalysisType, focusLabelSaved);
+        document.getElementById('btnViewAI').style.display = '';
+        const html = generateWordDoc(text, t.name, g.name, selectedAnalysisType);
+        downloadWordDoc(html, t.name, g.name);
+        output.innerHTML = `<span style="color:var(--accent)">✓ Arquivo baixado: <b>panda_analise_${t.name.replace(/\s+/g,'_')}_${g.name.replace(/\s+/g,'_')}.doc</b></span><br><br><span style="color:var(--muted);font-size:11px">Abra no Word ou LibreOffice para ver a análise completa em português.</span>`;
+        return;
+      }
+      // Se o servidor retornou erro não-404, mostrar mensagem
+      if (res.status !== 404) {
+        const error = await res.json().catch(() => ({}));
+        output.innerHTML = `<span style="color:var(--danger)">Erro ${res.status}: ${error.error || 'Falha no servidor.'}</span>`;
+        return;
+      }
+      // 404: cai no fallback direto abaixo
+    } catch(e) { /* rede indisponível, tenta fallback */ }
+  }
+
+  if (!isAdminConfigAllowed()) {
+    output.innerHTML = '<span style="color:var(--muted)">Servidor indisponível. A análise IA só funciona com o backend ativo em /api/analyze.</span>';
+    return;
+  }
+
+  const apiKey = getStoredApiKey();
+  if (!apiKey) {
+    output.innerHTML = '<span style="color:var(--muted)">Servidor não encontrado. Configure a chave Groq no painel de admin.</span>';
+    return;
+  }
+
+  // Fallback direto para Groq
+  let systemMessage, prompt;
+  if (isChartMode) {
+    const cp = buildChartPrompt(t.name, g.name, p.length, summary, focusLabel, focusInstruction, customQuestion);
+    systemMessage = cp.systemMsg;
+    prompt = cp.userMsg;
+  } else {
+    systemMessage = 'Você é um analista de futebol americano flag x9 brasileiro. REGRA ABSOLUTA E INVIOLÁVEL: escreva TODA a resposta EXCLUSIVAMENTE em português do Brasil. NUNCA use inglês em nenhuma palavra, frase ou expressão. NÃO exiba raciocínio interno, pensamento em cadeia ou processo de elaboração — responda APENAS com a análise final pronta. Seja direto, objetivo e baseie-se em porcentagens e números concretos extraídos dos dados fornecidos.';
+    prompt = `[IDIOMA OBRIGATÓRIO: PORTUGUÊS DO BRASIL. NENHUMA PALAVRA EM INGLÊS.]\n\nAnalise o scout do time "${t.name}" — jogo "${g.name}" (${p.length} jogadas).\n\nFOCO: ${focusLabel}\n${focusInstruction}\n\nFORMATO OBRIGATÓRIO:\n- Comece DIRETAMENTE com o primeiro bloco de dados, sem introdução\n- Cada bloco: título em CAIXA ALTA + dados em porcentagem\n- Toda afirmação deve ter número ou % — zero texto genérico\n- Ao final, bloco "RECOMENDAÇÃO TÁTICA" com 2-3 ajustes práticos e objetivos\n- Máximo 500 palavras\n- Apenas texto simples — sem asteriscos, sem markdown, use ━ como separador\n\nSCOUT:\n${summary}`;
+  }
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'system', content: systemMessage }, { role: 'user', content: prompt }],
+        max_tokens: isChartMode ? 2000 : 1200, temperature: 0.3
+      })
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        output.innerHTML = '<span style="color:var(--danger)">Chave de API inválida. Ajuste a chave no painel de admin.</span>';
+        return;
+      }
+      output.innerHTML = `<span style="color:var(--danger)">Erro ${res.status}: ${error.error?.message || 'Falha na API Groq.'}</span>`;
+      return;
+    }
+    const data = await res.json();
+    let text = data.choices?.[0]?.message?.content || '';
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    if (!text) {
+      output.innerHTML = '<span style="color:var(--danger)">Resposta vazia da IA.</span>';
+      return;
+    }
+
+    if (isChartMode) {
+      try {
+        const jsonData = parseAIJsonResponse(text);
+        renderAIDashboard(jsonData, t.name, g.name, focusLabel);
+        const focusLabelSaved2 = selectedAnalysisType === 'custom' ? customQuestion.substring(0,30) : (TYPE_LABELS[selectedAnalysisType] || '');
+        saveAIHistory('[GRÁFICO] ' + JSON.stringify(jsonData).substring(0,200), selectedAnalysisType, '📊 ' + focusLabelSaved2);
+        document.getElementById('btnViewAI').style.display = '';
+        return;
+      } catch(parseErr) {
+        output.innerHTML = '<span style="color:var(--danger)">Erro ao interpretar dados para gráficos. Tente novamente ou use o modo Doc.</span>';
+        notifyErrorToAdmin('analyzeWithAI-charts-parse-fallback', parseErr);
+        return;
+      }
+    }
+
+    const focusLabelSaved2 = selectedAnalysisType === 'custom' ? customQuestion.substring(0,30) : (TYPE_LABELS[selectedAnalysisType] || '');
+    saveAIHistory(text, selectedAnalysisType, focusLabelSaved2);
+    document.getElementById('btnViewAI').style.display = '';
+    const html = generateWordDoc(text, t.name, g.name, selectedAnalysisType);
+    downloadWordDoc(html, t.name, g.name);
+    output.innerHTML = `<span style="color:var(--accent)">✓ Arquivo baixado: <b>panda_analise_${t.name.replace(/\s+/g,'_')}_${g.name.replace(/\s+/g,'_')}.doc</b></span><br><br><span style="color:var(--muted);font-size:11px">Abra no Word ou LibreOffice para ver a análise completa em português.</span>`;
+  } catch(err) {
+    output.innerHTML = `<span style="color:var(--danger)">Erro ao conectar com a IA: ${err.message}</span>`;
+  }
+}
+
+// ── FILTERS ──
+let activeFilters = {};
+let selectedAnalysisType = 'terceiro_down';
+let selectedOutputMode = 'doc';
+let _showOnlyFlagged = false;
+
+function setOutputMode(mode) {
+  selectedOutputMode = mode;
+  document.getElementById('btnModeDoc').classList.toggle('active', mode === 'doc');
+  document.getElementById('btnModeCharts').classList.toggle('active', mode === 'charts');
+}
+
+function toggleFlagFilter() {
+  _showOnlyFlagged = !_showOnlyFlagged;
+  const btn = document.getElementById('btnFlagFilter');
+  if (btn) {
+    btn.style.borderColor = _showOnlyFlagged ? 'var(--accent)' : 'var(--muted)';
+    btn.style.color       = _showOnlyFlagged ? 'var(--accent)' : 'var(--muted)';
+    btn.style.background  = _showOnlyFlagged ? 'rgba(200,241,53,.07)' : '';
+  }
+  renderTable();
+}
+
+function initFilterOptions() {
+  const modality = db.teams[currentTeamId]?.games[currentGameId]?.modality || '';
+  const RESULT = getResult(modality);
+  const map = {
+    fQuarter: QUARTER, fDown: DOWN, fType: TYPE, fRunType: RUN_TYPE,
+    fHash: HASH, fDefForm: getDefFormation(modality), fCov: getCoverage(modality), fResult: RESULT,
+    fZone: FIELD_ZONE, fPersonnel: PERSONNEL, fPressure: PRESSURE
+  };
+  for (const [id, opts] of Object.entries(map)) {
+    const sel = document.getElementById(id);
+    if (!sel) continue;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">—</option>';
+    opts.forEach(o => { const op = document.createElement('option'); op.value=o; op.textContent=o; if(o===cur) op.selected=true; sel.appendChild(op); });
+  }
+}
+
+function setFilter(field, value) {
+  if (value) activeFilters[field] = value.toLowerCase();
+  else delete activeFilters[field];
+  renderTable();
+}
+
+function clearFilters() {
+  activeFilters = {};
+  _showOnlyFlagged = false;
+  const btn = document.getElementById('btnFlagFilter');
+  if (btn) { btn.style.borderColor='var(--muted)'; btn.style.color='var(--muted)'; btn.style.background=''; }
+  ['fQuarter','fDown','fType','fRunType','fHash','fDefForm','fCov','fResult','fZone','fPersonnel','fPressure'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['fDist','fForm','fRoute','fYards','fObs','fYardLine'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  renderTable();
+}
+
+function getFilteredPlays(p) {
+  let result = p;
+  if (_showOnlyFlagged) result = result.filter(x => x.flagged);
+  if (!Object.keys(activeFilters).length) return result;
+  return result.filter(play => {
+    for (const [field, val] of Object.entries(activeFilters)) {
+      if (!String(play[field]||'').toLowerCase().includes(val)) return false;
+    }
+    return true;
+  });
+}
+
+function setAnalysisType(btn, type) {
+  selectedAnalysisType = type;
+  document.querySelectorAll('.ai-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const customBar = document.getElementById('aiCustomBar');
+  const customInput = document.getElementById('aiCustomQuestion');
+  if (type === 'custom') {
+    customBar.classList.add('visible');
+    customInput.focus();
+  } else {
+    customBar.classList.remove('visible');
+  }
+}
+
+// ── TOAST ──
+function showToast(msg, type='success', duration=3500) {
+  const c = document.getElementById('toastContainer');
+  if (!c) return null;
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<span class="toast-msg">${msg}</span><button class="toast-close" onclick="this.closest('.toast').remove()">\u00d7</button>`;
+  c.appendChild(el);
+  const timer = setTimeout(() => {
+    el.style.opacity='0'; el.style.transform='translateX(12px)'; el.style.transition='.25s';
+    setTimeout(()=>el.remove(),260);
+  }, duration);
+  el.querySelector('.toast-close').addEventListener('click', () => clearTimeout(timer));
+  return el;
+}
+
+// ── CONFIRM MODAL ──
+let _confirmCallback = null;
+function showConfirm(msg, onConfirm, confirmLabel='Confirmar', danger=true) {
+  _confirmCallback = onConfirm;
+  document.getElementById('confirmMsg').innerHTML = msg;
+  const btn = document.getElementById('confirmOkBtn');
+  btn.textContent = confirmLabel;
+  btn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+  openModal('modalConfirm');
+}
+function _doConfirm() { closeModal('modalConfirm'); if(_confirmCallback) _confirmCallback(); _confirmCallback=null; }
+function _cancelConfirm() { closeModal('modalConfirm'); _confirmCallback=null; }
+
+// ── LOADING ──
+function showLoading(msg='Carregando...') {
+  const el=document.getElementById('loadingOverlay'); if(!el) return;
+  el.querySelector('.loading-text').textContent=msg; el.classList.add('visible');
+}
+function hideLoading() { document.getElementById('loadingOverlay')?.classList.remove('visible'); }
+
+// ── CHARTS ──
+function renderPieChart(containerId, data, title) {
+  const el = document.getElementById(containerId); if(!el) return;
+  const total = data.reduce((s,d)=>s+(d.value||0),0);
+  if (!total) { el.innerHTML=`<div class="chart-title">${title}</div><div class="chart-no-data">Sem dados</div>`; return; }
+  const cx=40, cy=40, r=36;
+  let paths='', legend='', angle=-Math.PI/2;
+  data.forEach(d => {
+    if (!d.value) return;
+    const a=(d.value/total)*2*Math.PI;
+    const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(angle+a),y2=cy+r*Math.sin(angle+a);
+    paths+=`<path d="M${cx},${cy}L${x1.toFixed(1)},${y1.toFixed(1)}A${r},${r} 0 ${a>Math.PI?1:0},1 ${x2.toFixed(1)},${y2.toFixed(1)}Z" fill="${d.color}" opacity=".88"/>`;
+    const pct=Math.round(d.value/total*100);
+    legend+=`<div class="chart-legend-item"><span class="chart-swatch" style="background:${d.color}"></span>${d.label}<span style="margin-left:auto;color:var(--text)">${pct}%</span></div>`;
+    angle+=a;
+  });
+  el.innerHTML=`<div class="chart-title">${title}</div><svg viewBox="0 0 80 80" width="76" height="76">${paths}</svg><div class="chart-legend">${legend}</div>`;
+}
+
+function renderCharts() {
+  const plays = db.teams[currentTeamId]?.games[currentGameId]?.plays || [];
+  renderPieChart('chartPassRun',[
+    {label:'Passe',value:plays.filter(x=>x.type==='Passe').length,color:'#ff4d00'},
+    {label:'Corrida',value:plays.filter(x=>x.type==='Corrida').length,color:'#4d88ff'},
+    {label:'Outros',value:plays.filter(x=>x.type&&x.type!=='Passe'&&x.type!=='Corrida').length,color:'#555'}
+  ],'Tipo de Jogada');
+  const covColors=['#c8f135','#ff4d00','#4d88ff','#f0c040','#a04dff'];
+  const covData=COVERAGE.map((c,i)=>({label:c,value:plays.filter(x=>x.coverage===c).length,color:covColors[i]})).filter(d=>d.value>0);
+  renderPieChart('chartCoverage',covData.length?covData:[{label:'Sem dados',value:1,color:'#222'}],'Cobertura Def.');
+  const downColors=['#c8f135','#ff4d00','#4d88ff','#f0c040'];
+  const downData=['1\u00ba Down','2\u00ba Down','3\u00ba Down','4\u00ba Down'].map((d,i)=>({label:d,value:plays.filter(x=>x.down===d).length,color:downColors[i]})).filter(d=>d.value>0);
+  renderPieChart('chartDowns',downData.length?downData:[{label:'Sem dados',value:1,color:'#222'}],'Downs');
+}
+
+// ── AI HISTORY ──
+function saveAIHistory(text, type, label) {
+  const g = db.teams[currentTeamId]?.games[currentGameId];
+  if (!g) return;
+  if (!g.aiHistory) g.aiHistory = [];
+  const shortLabel = type==='custom' ? `\ud83d\udcac ${label.substring(0,28)}` : label;
+  g.aiHistory.unshift({ id: Date.now(), type, label: shortLabel, text, date: new Date().toLocaleDateString('pt-BR') });
+  if (g.aiHistory.length > 10) g.aiHistory = g.aiHistory.slice(0, 10);
+  saveDB();
+  renderAIHistory();
+}
+
+function renderAIHistory() {
+  const g = db.teams[currentTeamId]?.games[currentGameId];
+  const panel = document.getElementById('aiPanel');
+  if (!g || !g.aiHistory?.length || !panel) return;
+  let histDiv = document.getElementById('aiHistorySection');
+  if (!histDiv) { histDiv=document.createElement('div'); histDiv.id='aiHistorySection'; histDiv.className='ai-history-section'; panel.appendChild(histDiv); }
+  histDiv.innerHTML = `<div class="ai-history-title">\ud83d\udcc2 An\u00e1lises Salvas (${g.aiHistory.length})</div><div class="ai-history-list">${
+    g.aiHistory.slice(0,8).map((h,i)=>`<div class="ai-history-item">
+      <span class="ai-history-label">${h.label}</span>
+      <span class="ai-history-date">${h.date}</span>
+      <button class="btn btn-sm" style="font-size:9px;padding:3px 8px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" data-hidx="${i}">\u21d3 .doc</button>
+    </div>`).join('')
+  }</div>`;
+  histDiv.querySelectorAll('.ai-history-item').forEach(el => {
+    const idx = parseInt(el.querySelector('button').dataset.hidx);
+    el.onclick = () => { document.getElementById('aiOutput').textContent = g.aiHistory[idx]?.text || ''; document.getElementById('aiPanel').classList.add('visible'); };
+    el.querySelector('button').onclick = e => { e.stopPropagation(); const h=g.aiHistory[idx]; if(!h) return; const t=db.teams[currentTeamId]; downloadWordDoc(generateWordDoc(h.text,t.name,g.name,h.type),t.name,g.name); };
+  });
+}
+
+// ── TEAM DASHBOARD ──
+function renderTeamDashboard() {
+  const el = document.getElementById('teamDashboard');
+  if (!el) return;
+  const t = db.teams[currentTeamId];
+  if (!t) { el.style.display='none'; return; }
+  const games = Object.values(t.games || {});
+  if (!games.length) { el.style.display='none'; return; }
+  el.style.display = '';
+  const allPlays = games.flatMap(g => g.plays || []);
+  const total = allPlays.length;
+  if (!total) { el.innerHTML=`<div class="team-dashboard-title">\ud83d\udcca Estat\u00edsticas Agregadas (${games.length} jogo${games.length!==1?'s':''})</div><div style="color:var(--muted);font-size:10px;letter-spacing:1px">Nenhuma jogada registrada ainda.</div>`; return; }
+  const passes=allPlays.filter(x=>x.type==='Passe').length;
+  const corridas=allPlays.filter(x=>x.type==='Corrida').length;
+  const convs=allPlays.filter(x=>x.result==='Convers\u00e3o'||x.result==='Touchdown').length;
+  const in3d=allPlays.filter(x=>x.down==='3\u00ba Down');
+  const conv3dPct=in3d.length?Math.round(in3d.filter(x=>x.result==='Convers\u00e3o'||x.result==='Touchdown').length/in3d.length*100):0;
+  const topCov=COVERAGE.map(c=>({c,n:allPlays.filter(x=>x.coverage===c).length})).sort((a,b)=>b.n-a.n)[0];
+  el.innerHTML=`<div class="team-dashboard-title">\ud83d\udcca Estat\u00edsticas Agregadas \u2014 ${games.length} jogo${games.length!==1?'s':''} \u00b7 ${total} jogadas</div>
+  <div class="team-dashboard-stats">
+    <div class="tdstat"><div class="tdstat-value" style="color:#ff4d00">${total?Math.round(passes/total*100):0}%</div><div class="tdstat-label">% Passe</div></div>
+    <div class="tdstat"><div class="tdstat-value" style="color:#4d88ff">${total?Math.round(corridas/total*100):0}%</div><div class="tdstat-label">% Corrida</div></div>
+    <div class="tdstat"><div class="tdstat-value" style="color:var(--accent)">${total?Math.round(convs/total*100):0}%</div><div class="tdstat-label">% Convers\u00e3o</div></div>
+    <div class="tdstat"><div class="tdstat-value">${conv3dPct}%</div><div class="tdstat-label">Conv. 3\u00ba Down</div></div>
+    ${topCov&&topCov.n?`<div class="tdstat"><div class="tdstat-value" style="font-size:14px;padding-top:4px">${topCov.c}</div><div class="tdstat-label">Cobertura +freq.</div></div>`:''}
+  </div>`;
+}
+
+// ── SORT ──
+let _sortField = null;
+let _sortDir = 1;
+const SORT_ORDER = { down:['1\u00ba Down','2\u00ba Down','3\u00ba Down','4\u00ba Down','Extra Point'], type:TYPE, result:RESULT_BASE, fieldZone:FIELD_ZONE, quarter:QUARTER, personnel:PERSONNEL, pressure:PRESSURE, runType:RUN_TYPE, hash:HASH };
+
+function toggleSort(field) {
+  if (_sortField===field) _sortDir*=-1; else { _sortField=field; _sortDir=1; }
+  renderTable();
+}
+
+function getSortedPlays(p) {
+  if (!_sortField) return p;
+  return [...p].sort((a,b) => {
+    const av=a[_sortField]||'', bv=b[_sortField]||'';
+    if (_sortField==='yards') return _sortDir*((parseFloat(av)||0)-(parseFloat(bv)||0));
+    if (_sortField==='distance') return _sortDir*((parseFloat(av)||0)-(parseFloat(bv)||0));
+    const order=SORT_ORDER[_sortField];
+    if (order) return _sortDir*(order.indexOf(av)-order.indexOf(bv));
+    return _sortDir*av.localeCompare(bv,'pt-BR');
+  });
+}
+
+function updateSortHeaders() {
+  ['down','distance','type','defFormation','coverage','result','yards','fieldZone','quarter','yardLine','personnel','runType','hash','pressure'].forEach(f => {
+    const th=document.getElementById('th-'+f); if(!th) return;
+    th.classList.remove('sort-asc','sort-desc');
+    if (_sortField===f) th.classList.add(_sortDir===1?'sort-asc':'sort-desc');
+  });
+}
+
+// ── GLOBAL SEARCH ──
+function openSearch() {
+  document.getElementById('searchModal').classList.add('open');
+  document.getElementById('searchInput').value='';
+  document.getElementById('searchResults').innerHTML='';
+  document.getElementById('searchHint').style.display='';
+  setTimeout(()=>document.getElementById('searchInput').focus(),60);
+}
+function closeSearch() { document.getElementById('searchModal').classList.remove('open'); }
+
+function runSearch(q) {
+  const results=document.getElementById('searchResults');
+  const hint=document.getElementById('searchHint');
+  if (!q.trim()) { results.innerHTML=''; hint.style.display=''; return; }
+  hint.style.display='none';
+  const ql=q.toLowerCase();
+  const matches=[];
+  Object.values(db.teams||{}).forEach(t => {
+    const tMatch=t.name.toLowerCase().includes(ql)||(t.league||'').toLowerCase().includes(ql);
+    Object.values(t.games||{}).forEach(g => {
+      const gMatch=g.name.toLowerCase().includes(ql);
+      const playMatches=(g.plays||[]).filter(p=>[p.type,p.formation,p.defFormation,p.coverage,p.route,p.result,p.fieldZone,p.obs,p.down].some(f=>(f||'').toLowerCase().includes(ql)));
+      if (tMatch||gMatch) matches.push({type:'game',teamId:t.id,gameId:g.id,teamName:t.name,gameName:g.name,plays:(g.plays||[]).length});
+      if (playMatches.length) { const s=playMatches[0]; matches.push({type:'plays',teamId:t.id,gameId:g.id,teamName:t.name,gameName:g.name,count:playMatches.length,sample:s}); }
+    });
+  });
+  if (!matches.length) { results.innerHTML='<div class="search-empty">Nenhum resultado encontrado.</div>'; return; }
+  window._searchMatches=matches.slice(0,12);
+  results.innerHTML=window._searchMatches.map((m,i)=>{
+    if (m.type==='game') return `<div class="search-result" data-idx="${i}"><div class="search-result-title">\ud83d\udccb ${m.gameName}</div><div class="search-result-meta">${m.teamName} \u00b7 ${m.plays} jogadas</div></div>`;
+    const s=m.sample; return `<div class="search-result" data-idx="${i}"><div class="search-result-title">\ud83c\udfaf ${m.count} jogada${m.count!==1?'s':''} encontrada${m.count!==1?'s':''}</div><div class="search-result-meta">${m.teamName} \u00b7 ${m.gameName}</div><div class="search-result-match">${[s.type,s.formation,s.coverage,s.route].filter(Boolean).join(' \u00b7 ')}</div></div>`;
+  }).join('');
+  results.querySelectorAll('.search-result').forEach(el=>{
+    const m=window._searchMatches[parseInt(el.dataset.idx)];
+    el.onclick=()=>{ closeSearch(); if(m) openGame(m.teamId,m.gameId); };
+  });
+}
+
+function handleSearchKey(e) {
+  if (e.key==='Escape') closeSearch();
+  if (e.key==='Enter') { const f=document.querySelector('.search-result'); if(f) f.click(); }
+}
+
+// ── NOTES ──
+let _notesExpanded = false;
+function toggleNotes() {
+  _notesExpanded=!_notesExpanded;
+  document.getElementById('notesBody').style.display=_notesExpanded?'':'none';
+  document.getElementById('notesToggleBtn').textContent=_notesExpanded?'\u25bc recolher':'\u25b6 expandir';
+}
+
+// ── DUPLICATE PLAY ──
+function duplicateRow(id) {
+  const p=db.teams[currentTeamId].games[currentGameId].plays;
+  const i=p.findIndex(x=>x.id===id); if(i===-1) return;
+  const copy=Object.assign({},p[i],{id:Date.now()+Math.random()});
+  p.splice(i+1,0,copy); saveDB(); renderTable(); renderCharts();
+  showToast('Jogada duplicada.','success',2000);
+}
+
+// ── INIT ──
+async function initApp() {
+  initFilterOptions();
+  await initFirebaseClient();
+
+  // Atalho de teclado para busca global
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); openSearch(); }
+    if (e.key === 'Escape') {
+      if (document.getElementById('searchModal')?.classList.contains('open')) { closeSearch(); return; }
+      // Fecha o modal-overlay mais recentemente aberto
+      const openModals = [...document.querySelectorAll('.modal-overlay.open')];
+      if (openModals.length) { openModals[openModals.length - 1].classList.remove('open'); }
+    }
+  });
+
+  if (!_firebaseAuth) {
+    showLoginScreen();
+  }
+}
+initApp();
+
+// ── PWA SERVICE WORKER ──
+if ('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE = 'panda-v1';
+const STATIC = [
+  '/',
+  '/api/analyze'
+];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/']).catch(()=>{})));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  // Cache-first para assets est\u00e1ticos (HTML principal)
+  if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+    e.respondWith(caches.open(CACHE).then(c =>
+      fetch(e.request).then(r => { c.put(e.request, r.clone()); return r; }).catch(() => c.match(e.request))
+    ));
+    return;
+  }
+  // Network-first para API
+  if (url.pathname.startsWith('/api/')) {
+    e.respondWith(fetch(e.request).catch(() => new Response(JSON.stringify({error:'offline'}),{headers:{'Content-Type':'application/json'}})));
+    return;
+  }
+  // Stale-while-revalidate para fontes/CDN
+  e.respondWith(caches.open(CACHE).then(c =>
+    c.match(e.request).then(cached => {
+      const net = fetch(e.request).then(r => { c.put(e.request, r.clone()); return r; }).catch(()=>{});
+      return cached || net;
+    })
+  ));
+});
+`;
+  const blob = new Blob([swCode], {type:'text/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).then(reg => {
+    console.info('[PANDA] Service Worker registrado:', reg.scope);
+  }).catch(e => console.warn('[PANDA] SW falhou:', e));
+}
+
+
+</script>
+</body>
+</html>
