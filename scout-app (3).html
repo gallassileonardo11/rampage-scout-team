@@ -63,6 +63,7 @@
 
   /* MODAL */
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:1100; align-items:center; justify-content:center; }
+  #modalConfirm { z-index:1300; }
   .modal-overlay.open { display:flex; }
   .modal { background:var(--surface); border:1px solid var(--border); padding:28px; width:420px; max-width:95vw; }
   .modal-title { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:3px; color:var(--accent); margin-bottom:20px; }
@@ -1549,12 +1550,16 @@ function hidePendingScreen() {
 }
 
 async function approveUser(uid) {
-  if (!_firebaseDb) return;
   try {
-    await _firebaseDb.collection('userProfiles').doc(uid).update({ approved: true });
-    const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
-    const userEmail = profileSnap.exists ? profileSnap.data().email : null;
-    const userName  = profileSnap.exists ? profileSnap.data().displayName : '';
+    const profileSnap = await _firebaseDb?.collection('userProfiles').doc(uid).get();
+    const userEmail = profileSnap?.exists ? profileSnap.data().email : null;
+    const userName  = profileSnap?.exists ? profileSnap.data().displayName : '';
+    const resp = await fetch(`/api/billing/${uid}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid, email: userEmail || '', billing: {}, profilePatch: { approved: true } })
+    });
+    if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).error || `HTTP ${resp.status}`);
     if (userEmail) {
       fetch('/api/notify-approved', {
         method: 'POST',
@@ -1570,7 +1575,8 @@ async function approveUser(uid) {
 async function rejectUser(uid) {
   showConfirm('Rejeitar e remover esse usuário do sistema?', async () => {
     try {
-      await _firebaseDb.collection('userProfiles').doc(uid).delete();
+      const resp = await fetch(`/api/user-profile/${uid}`, { method: 'DELETE' });
+      if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).error || `HTTP ${resp.status}`);
       await refreshAdminCurrentTab();
       showToast('Usuário rejeitado e removido.', 'warning');
     } catch(e) { notifyErrorToAdmin('rejeitar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
@@ -1580,7 +1586,14 @@ async function rejectUser(uid) {
 async function revokeUser(uid) {
   showConfirm('Revogar aprovação desse usuário?', async () => {
     try {
-      await _firebaseDb.collection('userProfiles').doc(uid).update({ approved: false });
+      const profileSnap = await _firebaseDb?.collection('userProfiles').doc(uid).get();
+      const userEmail = profileSnap?.exists ? profileSnap.data().email : '';
+      const resp = await fetch(`/api/billing/${uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid, email: userEmail, billing: {}, profilePatch: { approved: false } })
+      });
+      if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).error || `HTTP ${resp.status}`);
       await refreshAdminCurrentTab();
       showToast('Acesso revogado.', 'warning');
     } catch(e) { notifyErrorToAdmin('revogar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
