@@ -1695,6 +1695,7 @@ let _adminUnreadErrors = 0;
 function refreshAdminCurrentTab() {
   if (_currentAdminTab === 'content') return renderAdminContent();
   if (_currentAdminTab === 'subscriptions') return renderAdminSubscriptions();
+  if (_currentAdminTab === 'errors') return renderAdminErrors();
   return renderAdminUsers();
 }
 
@@ -1799,6 +1800,75 @@ function switchAdminTab(tab) {
   } else if (tab === 'errors') {
     _adminUnreadErrors = 0;
     if (errTab) errTab.textContent = 'Erros';
+  }
+}
+
+async function renderAdminUsers() {
+  const list = document.getElementById('adminUsersList');
+  list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Carregando...</div>';
+  if (!_firebaseDb) {
+    list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Firebase não conectado.</div>';
+    return;
+  }
+  try {
+    const snap = await _firebaseDb.collection('userProfiles').get();
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (_currentAdminTab === 'pending') {
+      docs = docs.filter(u => !u.approved && u.role !== 'admin');
+    }
+
+    if (_currentAdminTab === 'all' && _adminStatusFilter !== 'all') {
+      if (_adminStatusFilter === 'approved') docs = docs.filter(u => u.approved);
+      else if (_adminStatusFilter === 'pending_only') docs = docs.filter(u => !u.approved && u.role !== 'admin');
+      else if (_adminStatusFilter === 'admin') docs = docs.filter(u => u.role === 'admin');
+    }
+
+    const search = (document.getElementById('adminSearchInput')?.value || '').trim().toLowerCase();
+    if (search) docs = docs.filter(u => (u.email || '').toLowerCase().includes(search));
+
+    if (!docs.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Nenhum usuário encontrado.</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    docs.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'admin-user-row';
+      const roleClass = u.role === 'admin' ? 'admin' : 'user';
+      const roleLabel = u.role === 'admin' ? 'Admin' : 'Usuário';
+      const statusClass = u.approved ? 'approved' : 'pending';
+      const statusLabel = u.approved ? '✓ Aprovado' : '⏳ Pendente';
+      const billing = normalizeBilling(u.role === 'admin' ? { ...(u.billing || {}), plan: 'admin', status: 'ativo' } : (u.billing || {}));
+      const created = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—';
+      const firstLogin = u.firstLoginAt?.toDate ? u.firstLoginAt.toDate().toLocaleDateString('pt-BR') : (u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—');
+      const isCurrentAdmin = u.id === currentUser?.uid;
+
+      row.innerHTML = `
+        <div class="admin-user-email">${u.email || u.id}${isCurrentAdmin ? ' <span style="color:var(--muted);font-size:9px">(você)</span>' : ''}</div>
+        <span class="admin-user-role ${roleClass}">${roleLabel}</span>
+        <span class="admin-user-status ${statusClass}">${statusLabel}</span>
+        <span style="font-size:9px;letter-spacing:1px;color:var(--accent)">Plano ${billing.plan.toUpperCase()} · ${billing.status}</span>
+        <div class="admin-user-meta-dates">
+          <span class="admin-user-meta-date" title="Data de cadastro">📅 assinante desde ${created}</span>
+          <span class="admin-user-meta-date" title="Primeiro login">🔑 1º login: ${firstLogin}</span>
+        </div>
+        <select id="adminPlan_${u.id}" data-role="${u.role || 'user'}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
+        <select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>
+        <button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>
+        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-primary" onclick="approveUser('${u.id}','${u.email || ''}')">Aprovar</button>` : ''}
+        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="rejectUser('${u.id}')">Rejeitar</button>` : ''}
+        ${u.approved && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="opacity:.5" onclick="revokeUser('${u.id}','${u.email || ''}')">Revogar</button>` : ''}
+        ${u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}','${u.email || ''}')">Tornar admin</button>` : ''}
+        ${u.role === 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}','${u.email || ''}')">Remover admin</button>` : ''}
+        ${!isCurrentAdmin ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
+      `;
+      list.appendChild(row);
+    });
+  } catch (e) {
+    notifyErrorToAdmin('carregar usuários admin', e);
+    list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar usuários. O administrador foi notificado.</div>';
   }
 }
 
