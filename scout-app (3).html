@@ -2447,7 +2447,8 @@ function showAppForUser(user) {
   document.getElementById('btnPrint').style.display = 'none';
   document.getElementById('btnViewAI').style.display = 'none';
   // Carregar dados do usuário
-  Promise.all([loadDB(), loadBilling()]).then(() => {
+  const billingSync = _adminViewingUid ? loadBilling() : Promise.resolve(currentBilling);
+  Promise.all([loadDB(), billingSync]).then(() => {
     renderHome();
     renderSharedSection();
     handleHashRoute();
@@ -2458,7 +2459,9 @@ function showAppForUser(user) {
     renderHome();
     renderSharedSection();
     handleHashRoute();
-    showToast('Atenção: não foi possível sincronizar billing no servidor Firebase agora.', 'warning');
+    if (_adminViewingUid) {
+      showToast('Atenção: não foi possível sincronizar billing no servidor Firebase agora.', 'warning');
+    }
   });
 }
 
