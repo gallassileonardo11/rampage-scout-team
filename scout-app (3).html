@@ -1628,8 +1628,15 @@ async function persistAdminBillingRecord(uid, email, billing, profilePatch = {})
     body: JSON.stringify({ userId: uid, email, billing, profilePatch })
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Falha ao salvar plano no servidor Firebase.');
+    const raw = await res.text().catch(() => '');
+    let serverMessage = '';
+    try {
+      const parsed = raw ? JSON.parse(raw) : {};
+      serverMessage = parsed?.error || '';
+    } catch (_) {
+      serverMessage = raw.slice(0, 220);
+    }
+    throw new Error(serverMessage || `Falha ao salvar plano (HTTP ${res.status}).`);
   }
   return true;
 }
