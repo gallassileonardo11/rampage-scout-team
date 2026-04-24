@@ -1606,14 +1606,14 @@ function getAdminStatusOptions(selectedStatus = 'pendente') {
   return statuses.map(([value, label]) => `<option value="${value}" ${selectedStatus===value?'selected':''}>${label}</option>`).join('');
 }
 
-async function persistAdminBillingRecord(uid, email, billing) {
+async function persistAdminBillingRecord(uid, email, billing, profilePatch = {}) {
   if (window.location.protocol === 'file:') {
     throw new Error('Para salvar planos, execute o app via servidor (http://localhost:3000).');
   }
   const res = await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: uid, email, billing })
+    body: JSON.stringify({ userId: uid, email, billing, profilePatch })
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1630,15 +1630,14 @@ async function applyAdminBilling(uid, email, planOverride = null, statusOverride
   try {
     const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
     const currentRole = profileSnap.exists ? profileSnap.data()?.role : 'user';
-    const persisted = await persistAdminBillingRecord(uid, email, billing);
-    if (!persisted) throw new Error('Falha ao salvar plano');
+    let profilePatch = {};
     if (plan === 'admin') {
-      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'admin', approved: true, billing });
+      profilePatch = { role: 'admin', approved: true };
     } else if (currentRole === 'admin' && uid !== currentUser?.uid) {
-      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'user', approved: true, billing });
-    } else {
-      await _firebaseDb.collection('userProfiles').doc(uid).set({ billing }, { merge: true });
+      profilePatch = { role: 'user', approved: true };
     }
+    const persisted = await persistAdminBillingRecord(uid, email, billing, profilePatch);
+    if (!persisted) throw new Error('Falha ao salvar plano');
     showToast(`Plano de ${email || uid} atualizado para ${plan.toUpperCase()}.`, 'success');
     await refreshAdminCurrentTab();
   } catch (e) {
@@ -1652,10 +1651,9 @@ async function promoteUserToAdmin(uid) {
   showConfirm('Promover este usuário para admin com plano Admin Master?', async () => {
     try {
       const billing = normalizeBilling({ plan: 'admin', status: 'ativo' });
-      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'admin', approved: true, billing });
       const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
       const email = profileSnap.exists ? profileSnap.data()?.email : '';
-      await persistAdminBillingRecord(uid, email, billing);
+      await persistAdminBillingRecord(uid, email, billing, { role: 'admin', approved: true });
       showToast('Usuário promovido para admin.', 'success');
       await refreshAdminCurrentTab();
     } catch (e) {
@@ -1670,10 +1668,9 @@ async function demoteAdminToUser(uid) {
   showConfirm('Remover privilégios de admin deste usuário?', async () => {
     try {
       const billing = normalizeBilling({ plan: 'starter', status: 'ativo' });
-      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'user', approved: true, billing });
       const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
       const email = profileSnap.exists ? profileSnap.data()?.email : '';
-      await persistAdminBillingRecord(uid, email, billing);
+      await persistAdminBillingRecord(uid, email, billing, { role: 'user', approved: true });
       showToast('Privilégios de admin removidos.', 'warning');
       await refreshAdminCurrentTab();
     } catch (e) {
@@ -1832,15 +1829,15 @@ async function renderAdminUsers() {
           <span class="admin-user-meta-date" title="Data de cadastro">📅 assinante desde ${created}</span>
           <span class="admin-user-meta-date" title="Primeiro login">🔑 1º login: ${firstLogin}</span>
         </div>
-        ${_currentAdminTab === 'all' ? `<select id="adminPlan_${u.id}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>` : ''}
-        ${_currentAdminTab === 'all' ? `<select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>` : ''}
-        ${_currentAdminTab === 'all' ? `<button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>` : ''}
+        <select id="adminPlan_${u.id}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
+        <select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>
+        <button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>
         ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-primary" onclick="approveUser('${u.id}')">Aprovar</button>` : ''}
         ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="rejectUser('${u.id}')">Rejeitar</button>` : ''}
         ${u.approved && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="opacity:.5" onclick="revokeUser('${u.id}')">Revogar</button>` : ''}
-        ${_currentAdminTab === 'all' && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}')">Tornar admin</button>` : ''}
-        ${_currentAdminTab === 'all' && u.role === 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}')">Remover admin</button>` : ''}
-        ${_currentAdminTab === 'all' && !isCurrentAdmin ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
+        ${u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}')">Tornar admin</button>` : ''}
+        ${u.role === 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}')">Remover admin</button>` : ''}
+        ${!isCurrentAdmin ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
       `;
       list.appendChild(row);
     });
