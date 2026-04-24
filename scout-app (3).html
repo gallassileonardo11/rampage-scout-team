@@ -1606,6 +1606,22 @@ function getAdminStatusOptions(selectedStatus = 'pendente') {
   return statuses.map(([value, label]) => `<option value="${value}" ${selectedStatus===value?'selected':''}>${label}</option>`).join('');
 }
 
+async function persistAdminBillingRecord(uid, email, billing) {
+  if (window.location.protocol === 'file:') {
+    throw new Error('Para salvar planos, execute o app via servidor (http://localhost:3000).');
+  }
+  const res = await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: uid, email, billing })
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Falha ao salvar plano no servidor Firebase.');
+  }
+  return true;
+}
+
 async function applyAdminBilling(uid, email, planOverride = null, statusOverride = null) {
   if (!isAdminAccount()) return;
   const plan = planOverride || document.getElementById(`adminPlan_${uid}`)?.value || 'starter';
@@ -1614,12 +1630,8 @@ async function applyAdminBilling(uid, email, planOverride = null, statusOverride
   try {
     const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
     const currentRole = profileSnap.exists ? profileSnap.data()?.role : 'user';
-    const res = await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: uid, email, billing })
-    });
-    if (!res.ok) throw new Error('Falha ao salvar plano');
+    const persisted = await persistAdminBillingRecord(uid, email, billing);
+    if (!persisted) throw new Error('Falha ao salvar plano');
     if (plan === 'admin') {
       await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'admin', approved: true, billing });
     } else if (currentRole === 'admin' && uid !== currentUser?.uid) {
@@ -1643,11 +1655,7 @@ async function promoteUserToAdmin(uid) {
       await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'admin', approved: true, billing });
       const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
       const email = profileSnap.exists ? profileSnap.data()?.email : '';
-      await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid, email, billing })
-      });
+      await persistAdminBillingRecord(uid, email, billing);
       showToast('Usuário promovido para admin.', 'success');
       await refreshAdminCurrentTab();
     } catch (e) {
@@ -1665,11 +1673,7 @@ async function demoteAdminToUser(uid) {
       await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'user', approved: true, billing });
       const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
       const email = profileSnap.exists ? profileSnap.data()?.email : '';
-      await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid, email, billing })
-      });
+      await persistAdminBillingRecord(uid, email, billing);
       showToast('Privilégios de admin removidos.', 'warning');
       await refreshAdminCurrentTab();
     } catch (e) {
@@ -2449,6 +2453,12 @@ function showAppForUser(user) {
     handleHashRoute();
     // Iniciar listener de pendentes para admin
     if (currentUserRole === 'admin') startAdminPendingListener();
+  }).catch((e) => {
+    console.warn('[PANDA] billing/load warning:', e?.message || e);
+    renderHome();
+    renderSharedSection();
+    handleHashRoute();
+    showToast('Atenção: não foi possível sincronizar billing no servidor Firebase agora.', 'warning');
   });
 }
 
@@ -3008,34 +3018,27 @@ function saveBilling(data) {
   const uid = _adminViewingUid || currentUser?.uid || '';
   const email = (_adminViewingEmail || currentUser?.email || '').toLowerCase();
 
-  if (!uid && !email) return Promise.resolve(currentBilling);
+  if (!uid && !email) return Promise.reject(new Error('Usuário não identificado para salvar assinatura.'));
+  if (window.location.protocol === 'file:') {
+    return Promise.reject(new Error('Para salvar assinatura, execute o app via servidor (http://localhost:3000).'));
+  }
 
-  if (window.location.protocol !== 'file:') {
-    return fetch(`/api/billing/${encodeURIComponent(uid || 'guest')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: uid, email, billing: currentBilling })
+  return fetch(`/api/billing/${encodeURIComponent(uid || 'guest')}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: uid, email, billing: currentBilling })
+  })
+    .then(async r => {
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        throw new Error(data.error || 'Falha ao salvar assinatura no servidor Firebase.');
+      }
+      return r.json();
     })
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('Falha ao salvar assinatura no servidor')))
-      .then(json => {
-        currentBilling = normalizeBilling(json.billing || currentBilling);
-        return currentBilling;
-      })
-      .catch(async () => {
-        if (_firebaseDb && uid) {
-          await _firebaseDb.collection('userProfiles').doc(uid).set({ billing: currentBilling }, { merge: true });
-        }
-        return currentBilling;
-      });
-  }
-
-  if (_firebaseDb && uid) {
-    return _firebaseDb.collection('userProfiles').doc(uid).set({ billing: currentBilling }, { merge: true })
-      .then(() => currentBilling)
-      .catch(() => currentBilling);
-  }
-
-  return Promise.resolve(currentBilling);
+    .then(json => {
+      currentBilling = normalizeBilling(json.billing || currentBilling);
+      return currentBilling;
+    });
 }
 
 async function loadBilling() {
@@ -3046,26 +3049,18 @@ async function loadBilling() {
     return currentBilling;
   }
 
-  if (window.location.protocol !== 'file:') {
-    try {
-      const res = await fetch(`/api/billing/${encodeURIComponent(uid || 'guest')}?email=${encodeURIComponent(email)}`);
-      if (res.ok) {
-        const json = await res.json();
-        currentBilling = normalizeBilling(json.billing || {});
-        return currentBilling;
-      }
-    } catch (e) {}
+  if (window.location.protocol === 'file:') {
+    currentBilling = normalizeBilling({});
+    return currentBilling;
   }
 
-  if (_firebaseDb && uid) {
-    try {
-      const snap = await _firebaseDb.collection('userProfiles').doc(uid).get();
-      currentBilling = normalizeBilling(snap.data()?.billing || {});
-      return currentBilling;
-    } catch (e) {}
+  const res = await fetch(`/api/billing/${encodeURIComponent(uid || 'guest')}?email=${encodeURIComponent(email)}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Falha ao carregar assinatura no servidor Firebase.');
   }
-
-  currentBilling = normalizeBilling({});
+  const json = await res.json();
+  currentBilling = normalizeBilling(json.billing || {});
   return currentBilling;
 }
 
@@ -3125,10 +3120,16 @@ async function loadTeamSubscription(teamId) {
   if (!team) return null;
   const fallback = ensureTeamSubscription(teamId);
   const ownerUid = getTeamSubscriptionOwnerUid();
-  if (!ownerUid || ownerUid === 'local' || window.location.protocol === 'file:') return fallback;
+  if (!ownerUid || ownerUid === 'local') return fallback;
+  if (window.location.protocol === 'file:') {
+    throw new Error('Para carregar assinatura do time, execute o app via servidor (http://localhost:3000).');
+  }
   try {
     const res = await fetch(`/api/team-subscriptions/${encodeURIComponent(ownerUid)}/${encodeURIComponent(teamId)}?adminEmail=${encodeURIComponent(fallback.adminEmail)}`);
-    if (!res.ok) return fallback;
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Falha ao carregar assinatura do time no servidor Firebase.');
+    }
     const json = await res.json();
     let subscription = normalizeTeamSubscription(json.subscription || fallback, teamId);
     const shouldSeedRemote = !json.exists && (fallback.members.length || fallback.adminEmail !== getTeamSubscriptionDefaultEmail());
@@ -3141,7 +3142,7 @@ async function loadTeamSubscription(teamId) {
     }
     return subscription;
   } catch (e) {
-    return fallback;
+    throw e;
   }
 }
 
@@ -3153,22 +3154,24 @@ async function saveTeamSubscription(teamId, subscription) {
   const key = getTeamSubscriptionCacheKey(teamId);
   _teamSubscriptionsCache[key] = normalized;
   team.subscription = normalized;
-  if (!ownerUid || ownerUid === 'local' || window.location.protocol === 'file:') return normalized;
-  try {
-    const res = await fetch(`/api/team-subscriptions/${encodeURIComponent(ownerUid)}/${encodeURIComponent(teamId)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscription: normalized })
-    });
-    if (res.ok) {
-      const json = await res.json();
-      const remote = normalizeTeamSubscription(json.subscription || normalized, teamId);
-      _teamSubscriptionsCache[key] = remote;
-      team.subscription = remote;
-      return remote;
-    }
-  } catch (e) {}
-  return normalized;
+  if (!ownerUid || ownerUid === 'local') return normalized;
+  if (window.location.protocol === 'file:') {
+    throw new Error('Para salvar assinatura do time, execute o app via servidor (http://localhost:3000).');
+  }
+  const res = await fetch(`/api/team-subscriptions/${encodeURIComponent(ownerUid)}/${encodeURIComponent(teamId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subscription: normalized })
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Falha ao salvar assinatura do time no servidor Firebase.');
+  }
+  const json = await res.json();
+  const remote = normalizeTeamSubscription(json.subscription || normalized, teamId);
+  _teamSubscriptionsCache[key] = remote;
+  team.subscription = remote;
+  return remote;
 }
 
 function canManageTeamMembers(team) {
@@ -3191,7 +3194,14 @@ async function renderTeamMembers() {
   list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:8px;letter-spacing:1px">Carregando participantes...</div>';
   const b = getBilling();
   const rule = getPlanRule(b.plan || 'starter');
-  const sub = await loadTeamSubscription(team.id) || ensureTeamSubscription(team.id);
+  let sub;
+  try {
+    sub = await loadTeamSubscription(team.id);
+  } catch (e) {
+    sub = ensureTeamSubscription(team.id);
+    showToast('Não foi possível sincronizar assinatura do time no servidor Firebase.', 'warning');
+  }
+  sub = sub || ensureTeamSubscription(team.id);
   const canManage = !_publicReadonly && canManageTeamMembers(team);
   section.style.display = '';
   form.style.display = canManage ? 'flex' : 'none';
@@ -3220,7 +3230,14 @@ async function addTeamMember() {
     showToast('Apenas o administrador da assinatura deste time pode gerenciar participantes.', 'warning');
     return;
   }
-  const sub = await loadTeamSubscription(team.id) || ensureTeamSubscription(team.id);
+  let sub;
+  try {
+    sub = await loadTeamSubscription(team.id);
+  } catch (e) {
+    sub = ensureTeamSubscription(team.id);
+    showToast('Não foi possível carregar assinatura do time no servidor Firebase.', 'warning');
+  }
+  sub = sub || ensureTeamSubscription(team.id);
   const name = (document.getElementById('memberName').value || '').trim();
   const email = (document.getElementById('memberEmail').value || '').trim().toLowerCase();
   if (!email || !email.includes('@')) { showToast('Informe um email válido.', 'warning'); return; }
@@ -3229,7 +3246,12 @@ async function addTeamMember() {
   sub.members.push({ name, email });
   document.getElementById('memberName').value = '';
   document.getElementById('memberEmail').value = '';
-  await saveTeamSubscription(team.id, sub);
+  try {
+    await saveTeamSubscription(team.id, sub);
+  } catch (e) {
+    showToast(e?.message || 'Falha ao salvar assinatura do time no servidor Firebase.', 'error');
+    return;
+  }
   saveDB();
   await renderTeamMembers();
   showToast('Participante adicionado à assinatura do time.', 'success');
@@ -3239,10 +3261,22 @@ async function removeTeamMember(index) {
   if (_publicReadonly) return;
   const team = db.teams[currentTeamId];
   if (!team || !canManageTeamMembers(team)) return;
-  const sub = await loadTeamSubscription(team.id) || ensureTeamSubscription(team.id);
+  let sub;
+  try {
+    sub = await loadTeamSubscription(team.id);
+  } catch (e) {
+    sub = ensureTeamSubscription(team.id);
+    showToast('Não foi possível carregar assinatura do time no servidor Firebase.', 'warning');
+  }
+  sub = sub || ensureTeamSubscription(team.id);
   if (!sub.members[index]) return;
   sub.members.splice(index, 1);
-  await saveTeamSubscription(team.id, sub);
+  try {
+    await saveTeamSubscription(team.id, sub);
+  } catch (e) {
+    showToast(e?.message || 'Falha ao salvar assinatura do time no servidor Firebase.', 'error');
+    return;
+  }
   saveDB();
   await renderTeamMembers();
 }
@@ -3260,7 +3294,7 @@ function renderBillingModalities() {
   }
   if (!Array.isArray(b.allowedModalities) || !b.allowedModalities.length) {
     b.allowedModalities = [...rule.allowedModalities];
-    saveBilling(b);
+    saveBilling(b).catch((e) => showToast(e?.message || 'Falha ao salvar assinatura no servidor Firebase.', 'warning'));
   }
   const box = document.getElementById('billingModalities');
   const help = document.getElementById('billingModalityHelp');
@@ -3285,7 +3319,7 @@ function toggleBillingModality(modality) {
     if (arr.length >= rule.maxModalities) { showToast(`Este plano permite até ${rule.maxModalities} modalidade(s).`, 'warning'); return; }
     b.allowedModalities = [...arr, modality];
   }
-  saveBilling(b);
+  saveBilling(b).catch((e) => showToast(e?.message || 'Falha ao salvar assinatura no servidor Firebase.', 'error'));
   renderBillingModalities();
 }
 
@@ -3327,7 +3361,7 @@ function choosePlan(planId) {
   b.plan = planId;
   b.status = planId === 'admin' ? 'ativo' : (b.status || 'pendente');
   b.allowedModalities = [...rule.allowedModalities];
-  saveBilling(b);
+  saveBilling(b).catch((e) => showToast(e?.message || 'Falha ao salvar assinatura no servidor Firebase.', 'error'));
   openBillingModal();
 }
 
@@ -3341,7 +3375,7 @@ function confirmPixPayment() {
   if (!b.plan) { showToast('Selecione um plano antes de confirmar.', 'warning'); return; }
   b.status = 'ativo';
   b.lastPaid = new Date().toLocaleString('pt-BR');
-  saveBilling(b);
+  saveBilling(b).catch((e) => showToast(e?.message || 'Falha ao salvar assinatura no servidor Firebase.', 'error'));
   openBillingModal();
   showToast('Pagamento confirmado. Plano ativado.', 'success');
 }
