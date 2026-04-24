@@ -1583,15 +1583,13 @@ async function rejectUser(uid) {
   });
 }
 
-async function revokeUser(uid) {
+async function revokeUser(uid, email = '') {
   showConfirm('Revogar aprovação desse usuário?', async () => {
     try {
-      const profileSnap = await _firebaseDb?.collection('userProfiles').doc(uid).get();
-      const userEmail = profileSnap?.exists ? profileSnap.data().email : '';
       const resp = await fetch(`/api/billing/${uid}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid, email: userEmail, billing: {}, profilePatch: { approved: false } })
+        body: JSON.stringify({ userId: uid, email, billing: {}, profilePatch: { approved: false } })
       });
       if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).error || `HTTP ${resp.status}`);
       await refreshAdminCurrentTab();
@@ -1641,8 +1639,7 @@ async function applyAdminBilling(uid, email, planOverride = null, statusOverride
   const status = statusOverride || document.getElementById(`adminStatus_${uid}`)?.value || 'pendente';
   const billing = normalizeBilling({ plan, status, allowedModalities: getPlanRule(plan).allowedModalities });
   try {
-    const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
-    const currentRole = profileSnap.exists ? profileSnap.data()?.role : 'user';
+    const currentRole = document.getElementById(`adminPlan_${uid}`)?.dataset.role || 'user';
     let profilePatch = {};
     if (plan === 'admin') {
       profilePatch = { role: 'admin', approved: true };
@@ -1659,13 +1656,11 @@ async function applyAdminBilling(uid, email, planOverride = null, statusOverride
   }
 }
 
-async function promoteUserToAdmin(uid) {
+async function promoteUserToAdmin(uid, email = '') {
   if (!isAdminAccount() || uid === currentUser?.uid) return;
   showConfirm('Promover este usuário para admin com plano Admin Master?', async () => {
     try {
       const billing = normalizeBilling({ plan: 'admin', status: 'ativo' });
-      const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
-      const email = profileSnap.exists ? profileSnap.data()?.email : '';
       await persistAdminBillingRecord(uid, email, billing, { role: 'admin', approved: true });
       showToast('Usuário promovido para admin.', 'success');
       await refreshAdminCurrentTab();
@@ -1676,13 +1671,11 @@ async function promoteUserToAdmin(uid) {
   });
 }
 
-async function demoteAdminToUser(uid) {
+async function demoteAdminToUser(uid, email = '') {
   if (!isAdminAccount() || uid === currentUser?.uid) return;
   showConfirm('Remover privilégios de admin deste usuário?', async () => {
     try {
       const billing = normalizeBilling({ plan: 'starter', status: 'ativo' });
-      const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
-      const email = profileSnap.exists ? profileSnap.data()?.email : '';
       await persistAdminBillingRecord(uid, email, billing, { role: 'user', approved: true });
       showToast('Privilégios de admin removidos.', 'warning');
       await refreshAdminCurrentTab();
@@ -1842,14 +1835,14 @@ async function renderAdminUsers() {
           <span class="admin-user-meta-date" title="Data de cadastro">📅 assinante desde ${created}</span>
           <span class="admin-user-meta-date" title="Primeiro login">🔑 1º login: ${firstLogin}</span>
         </div>
-        <select id="adminPlan_${u.id}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
+        <select id="adminPlan_${u.id}" data-role="${u.role || 'user'}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
         <select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>
         <button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>
-        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-primary" onclick="approveUser('${u.id}')">Aprovar</button>` : ''}
+        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-primary" onclick="approveUser('${u.id}','${u.email || ''}')">Aprovar</button>` : ''}
         ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="rejectUser('${u.id}')">Rejeitar</button>` : ''}
-        ${u.approved && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="opacity:.5" onclick="revokeUser('${u.id}')">Revogar</button>` : ''}
-        ${u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}')">Tornar admin</button>` : ''}
-        ${u.role === 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}')">Remover admin</button>` : ''}
+        ${u.approved && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="opacity:.5" onclick="revokeUser('${u.id}','${u.email || ''}')">Revogar</button>` : ''}
+        ${u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}','${u.email || ''}')">Tornar admin</button>` : ''}
+        ${u.role === 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}','${u.email || ''}')">Remover admin</button>` : ''}
         ${!isCurrentAdmin ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
       `;
       list.appendChild(row);
@@ -1896,11 +1889,11 @@ async function renderAdminSubscriptions() {
           <span class="admin-user-role ${u.role === 'admin' ? 'admin' : 'user'}">${u.role === 'admin' ? 'Admin' : 'Usuário'}</span>
           <span class="admin-user-status ${billing.status === 'ativo' ? 'approved' : 'pending'}">${billing.status}</span>
           <span style="font-size:9px;letter-spacing:1px;color:var(--muted)">Modalidades: ${modalities}</span>
-          <select id="adminPlan_${u.id}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
+          <select id="adminPlan_${u.id}" data-role="${u.role || 'user'}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
           <select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>
           <button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>
-          ${u.role !== 'admin' && canChangeRole ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}')">Tornar admin</button>` : ''}
-          ${u.role === 'admin' && canChangeRole ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}')">Remover admin</button>` : ''}
+          ${u.role !== 'admin' && canChangeRole ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}','${u.email || ''}')">Tornar admin</button>` : ''}
+          ${u.role === 'admin' && canChangeRole ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}','${u.email || ''}')">Remover admin</button>` : ''}
           ${canChangeRole ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
         `;
         list.appendChild(row);
