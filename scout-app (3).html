@@ -1285,14 +1285,34 @@
     <div class="admin-tabs">
       <button class="admin-tab active" id="tabPending" onclick="switchAdminTab('pending')">Pendentes</button>
       <button class="admin-tab" id="tabAll" onclick="switchAdminTab('all')">Todos os Usuários</button>
+      <button class="admin-tab" id="tabSubscriptions" onclick="switchAdminTab('subscriptions')">Assinaturas</button>
       <button class="admin-tab" id="tabContent" onclick="switchAdminTab('content')">Conteúdo</button>
     </div>
     <div id="adminSearchBar" class="admin-search-bar" style="display:none">
-      <input class="admin-search-input" id="adminSearchInput" type="text" placeholder="Buscar por email..." oninput="renderAdminUsers()">
+      <input class="admin-search-input" id="adminSearchInput" type="text" placeholder="Buscar por email..." oninput="refreshAdminCurrentTab()">
       <button class="admin-filter-btn active" id="aFiltAll" onclick="setAdminFilter('all')">Todos</button>
       <button class="admin-filter-btn" id="aFiltApproved" onclick="setAdminFilter('approved')">Aprovados</button>
       <button class="admin-filter-btn" id="aFiltPending" onclick="setAdminFilter('pending_only')">Pendentes</button>
       <button class="admin-filter-btn" id="aFiltAdmin" onclick="setAdminFilter('admin')">Admins</button>
+    </div>
+    <div id="adminBillingBar" class="admin-search-bar" style="display:none;margin-top:-6px">
+      <select class="admin-search-input" id="adminBillingPlanFilter" style="max-width:160px" onchange="setAdminBillingFilter()">
+        <option value="all">Todos os planos</option>
+        <option value="starter">Starter</option>
+        <option value="pro">Pro</option>
+        <option value="club">Club</option>
+        <option value="admin">Admin Master</option>
+      </select>
+      <select class="admin-search-input" id="adminBillingStatusFilter" style="max-width:150px" onchange="setAdminBillingFilter()">
+        <option value="all">Todos os status</option>
+        <option value="ativo">Ativo</option>
+        <option value="pendente">Pendente</option>
+        <option value="inativo">Inativo</option>
+      </select>
+      <input class="admin-search-input" id="adminQuickEmail" type="text" placeholder="email@dominio.com" style="min-width:220px">
+      <select class="admin-search-input" id="adminQuickPlan" style="max-width:150px"></select>
+      <select class="admin-search-input" id="adminQuickStatus" style="max-width:130px"></select>
+      <button class="btn btn-sm" onclick="applyQuickBillingByEmail()">Aplicar por email</button>
     </div>
     <div id="adminUsersList" class="admin-users-list" style="flex:1;overflow-y:auto;min-height:120px"></div>
     <div class="modal-actions" style="margin-top:16px">
@@ -1348,6 +1368,8 @@ let currentUser = null; // Firebase Auth user
 let currentUserTeamName = '';
 let _pendingTeamName = '';
 let _teamModalEditId = null;
+let currentBilling = {};
+let _teamSubscriptionsCache = {};
 let _publicReadonly = false;
 let _installPrompt = null;
 let _diagramColor = '#c8f135';
@@ -1375,6 +1397,8 @@ function getDefFormation(modality) { return modality === 'Full Pad' ? DEF_FORM_F
 function getCoverage(modality) { return modality === 'Full Pad' ? COVERAGE_FULLPAD : COVERAGE; }
 
 function plays() { return db.teams[currentTeamId]?.games[currentGameId]?.plays || []; }
+
+function isAdminAccount() { return currentUserRole === 'admin'; }
 
 // ── FIREBASE CLIENT ──
 let _firebaseApp = null;
@@ -1454,6 +1478,7 @@ async function ensureUserProfile(user) {
       email: user.email,
       displayName: user.displayName || '',
       teamName: teamName,
+      billing: normalizeBilling(isAdmin ? { plan: 'admin', status: 'ativo' } : {}),
       approved: isAdmin ? true : false,
       role: isAdmin ? 'admin' : 'user',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1477,19 +1502,24 @@ async function ensureUserProfile(user) {
       }).catch(() => {});
     }
   } else if (isAdmin && snap.data().role !== 'admin') {
-    await ref.update({ role: 'admin', approved: true }).catch(() => {});
+    await ref.update({ role: 'admin', approved: true, billing: normalizeBilling({ plan: 'admin', status: 'ativo' }) }).catch(() => {});
   } else if (_pendingTeamName && !snap.data()?.teamName) {
     await ref.update({ teamName: _pendingTeamName }).catch(() => {});
+  } else if (!snap.data()?.billing) {
+    await ref.update({ billing: normalizeBilling(isAdmin ? { plan: 'admin', status: 'ativo' } : {}) }).catch(() => {});
+  } else if (isAdmin && snap.data()?.billing?.plan !== 'admin') {
+    await ref.update({ billing: normalizeBilling({ plan: 'admin', status: 'ativo' }) }).catch(() => {});
   }
   _pendingTeamName = '';
 }
 
 async function checkApproval(user) {
-  if (!_firebaseDb) { currentUserRole = 'user'; currentUserTeamName = ''; showAppForUser(user); return; }
+  if (!_firebaseDb) { currentUserRole = 'user'; currentUserTeamName = ''; currentBilling = normalizeBilling({}); showAppForUser(user); return; }
   try {
     const snap = await _firebaseDb.collection('userProfiles').doc(user.uid).get();
     const data = snap.exists ? snap.data() : {};
     currentUserTeamName = data.teamName || '';
+    currentBilling = normalizeBilling(data.role === 'admin' ? { ...(data.billing || {}), plan: 'admin', status: 'ativo' } : (data.billing || {}));
     currentUserRole = data.role === 'admin' ? 'admin' : 'user';
     if (currentUserRole === 'admin' || data.approved === true) {
       hidePendingScreen();
@@ -1499,6 +1529,7 @@ async function checkApproval(user) {
     }
   } catch(e) {
     currentUserTeamName = '';
+    currentBilling = normalizeBilling({});
     currentUserRole = 'user';
     showPendingScreen(user);
   }
@@ -1532,7 +1563,7 @@ async function approveUser(uid) {
       }).catch(() => {});
     }
     showToast(`Usuário ${userEmail||uid} aprovado.`, 'success');
-    await renderAdminUsers();
+    await refreshAdminCurrentTab();
   } catch(e) { notifyErrorToAdmin('aprovar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
 }
 
@@ -1540,7 +1571,7 @@ async function rejectUser(uid) {
   showConfirm('Rejeitar e remover esse usuário do sistema?', async () => {
     try {
       await _firebaseDb.collection('userProfiles').doc(uid).delete();
-      await renderAdminUsers();
+      await refreshAdminCurrentTab();
       showToast('Usuário rejeitado e removido.', 'warning');
     } catch(e) { notifyErrorToAdmin('rejeitar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
   });
@@ -1550,13 +1581,183 @@ async function revokeUser(uid) {
   showConfirm('Revogar aprovação desse usuário?', async () => {
     try {
       await _firebaseDb.collection('userProfiles').doc(uid).update({ approved: false });
-      await renderAdminUsers();
+      await refreshAdminCurrentTab();
       showToast('Acesso revogado.', 'warning');
     } catch(e) { notifyErrorToAdmin('revogar usuário', e); showToast('Ocorreu um erro. O administrador foi notificado.', 'error'); }
   });
 }
 
+function getAdminPlanOptions(selectedPlan = 'starter') {
+  const plans = [
+    ['starter', 'Starter'],
+    ['pro', 'Pro'],
+    ['club', 'Club'],
+    ['admin', 'Admin Master']
+  ];
+  return plans.map(([value, label]) => `<option value="${value}" ${selectedPlan===value?'selected':''}>${label}</option>`).join('');
+}
+
+function getAdminStatusOptions(selectedStatus = 'pendente') {
+  const statuses = [
+    ['pendente', 'Pendente'],
+    ['ativo', 'Ativo'],
+    ['inativo', 'Inativo']
+  ];
+  return statuses.map(([value, label]) => `<option value="${value}" ${selectedStatus===value?'selected':''}>${label}</option>`).join('');
+}
+
+async function applyAdminBilling(uid, email, planOverride = null, statusOverride = null) {
+  if (!isAdminAccount()) return;
+  const plan = planOverride || document.getElementById(`adminPlan_${uid}`)?.value || 'starter';
+  const status = statusOverride || document.getElementById(`adminStatus_${uid}`)?.value || 'pendente';
+  const billing = normalizeBilling({ plan, status, allowedModalities: getPlanRule(plan).allowedModalities });
+  try {
+    const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
+    const currentRole = profileSnap.exists ? profileSnap.data()?.role : 'user';
+    const res = await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid, email, billing })
+    });
+    if (!res.ok) throw new Error('Falha ao salvar plano');
+    if (plan === 'admin') {
+      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'admin', approved: true, billing });
+    } else if (currentRole === 'admin' && uid !== currentUser?.uid) {
+      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'user', approved: true, billing });
+    } else {
+      await _firebaseDb.collection('userProfiles').doc(uid).set({ billing }, { merge: true });
+    }
+    showToast(`Plano de ${email || uid} atualizado para ${plan.toUpperCase()}.`, 'success');
+    await refreshAdminCurrentTab();
+  } catch (e) {
+    notifyErrorToAdmin('atualizar plano do usuário', e);
+    showToast('Não foi possível atualizar o plano.', 'error');
+  }
+}
+
+async function promoteUserToAdmin(uid) {
+  if (!isAdminAccount() || uid === currentUser?.uid) return;
+  showConfirm('Promover este usuário para admin com plano Admin Master?', async () => {
+    try {
+      const billing = normalizeBilling({ plan: 'admin', status: 'ativo' });
+      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'admin', approved: true, billing });
+      const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
+      const email = profileSnap.exists ? profileSnap.data()?.email : '';
+      await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid, email, billing })
+      });
+      showToast('Usuário promovido para admin.', 'success');
+      await refreshAdminCurrentTab();
+    } catch (e) {
+      notifyErrorToAdmin('promover admin', e);
+      showToast('Não foi possível promover o usuário.', 'error');
+    }
+  });
+}
+
+async function demoteAdminToUser(uid) {
+  if (!isAdminAccount() || uid === currentUser?.uid) return;
+  showConfirm('Remover privilégios de admin deste usuário?', async () => {
+    try {
+      const billing = normalizeBilling({ plan: 'starter', status: 'ativo' });
+      await _firebaseDb.collection('userProfiles').doc(uid).update({ role: 'user', approved: true, billing });
+      const profileSnap = await _firebaseDb.collection('userProfiles').doc(uid).get();
+      const email = profileSnap.exists ? profileSnap.data()?.email : '';
+      await fetch(`/api/billing/${encodeURIComponent(uid)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid, email, billing })
+      });
+      showToast('Privilégios de admin removidos.', 'warning');
+      await refreshAdminCurrentTab();
+    } catch (e) {
+      notifyErrorToAdmin('rebaixar admin', e);
+      showToast('Não foi possível alterar o papel do usuário.', 'error');
+    }
+  });
+}
+
 let _currentAdminTab = 'pending';
+let _adminBillingPlanFilter = 'all';
+let _adminBillingStatusFilter = 'all';
+
+function refreshAdminCurrentTab() {
+  if (_currentAdminTab === 'content') return renderAdminContent();
+  if (_currentAdminTab === 'subscriptions') return renderAdminSubscriptions();
+  return renderAdminUsers();
+}
+
+function refreshAdminToolbar() {
+  const searchBar = document.getElementById('adminSearchBar');
+  const billingBar = document.getElementById('adminBillingBar');
+  const searchInput = document.getElementById('adminSearchInput');
+  const userFilterIds = ['aFiltAll','aFiltApproved','aFiltPending','aFiltAdmin'];
+  if (searchBar) searchBar.style.display = (_currentAdminTab === 'all' || _currentAdminTab === 'subscriptions') ? '' : 'none';
+  if (billingBar) billingBar.style.display = _currentAdminTab === 'subscriptions' ? '' : 'none';
+  if (searchInput) {
+    searchInput.placeholder = _currentAdminTab === 'subscriptions' ? 'Buscar assinatura por email...' : 'Buscar por email...';
+  }
+  userFilterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = _currentAdminTab === 'all' ? '' : 'none';
+  });
+}
+
+function syncAdminQuickControls() {
+  const quickPlan = document.getElementById('adminQuickPlan');
+  const quickStatus = document.getElementById('adminQuickStatus');
+  if (quickPlan && !quickPlan.innerHTML) quickPlan.innerHTML = getAdminPlanOptions('starter');
+  if (quickStatus && !quickStatus.innerHTML) quickStatus.innerHTML = getAdminStatusOptions('ativo');
+  const planFilter = document.getElementById('adminBillingPlanFilter');
+  const statusFilter = document.getElementById('adminBillingStatusFilter');
+  if (planFilter) planFilter.value = _adminBillingPlanFilter;
+  if (statusFilter) statusFilter.value = _adminBillingStatusFilter;
+}
+
+function setAdminBillingFilter() {
+  _adminBillingPlanFilter = document.getElementById('adminBillingPlanFilter')?.value || 'all';
+  _adminBillingStatusFilter = document.getElementById('adminBillingStatusFilter')?.value || 'all';
+  renderAdminSubscriptions();
+}
+
+async function findUserProfileByEmail(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!_firebaseDb || !normalizedEmail) return null;
+  const snap = await _firebaseDb.collection('userProfiles').where('email', '==', normalizedEmail).limit(1).get();
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return { id: doc.id, ...doc.data() };
+}
+
+async function applyQuickBillingByEmail() {
+  if (!isAdminAccount()) return;
+  const email = (document.getElementById('adminQuickEmail')?.value || '').trim().toLowerCase();
+  const plan = document.getElementById('adminQuickPlan')?.value || 'starter';
+  const status = document.getElementById('adminQuickStatus')?.value || 'ativo';
+  if (!email || !email.includes('@')) {
+    showToast('Informe um email válido para aplicar o plano.', 'warning');
+    return;
+  }
+  try {
+    const user = await findUserProfileByEmail(email);
+    if (!user) {
+      showToast('Nenhum usuário encontrado com este email.', 'warning');
+      return;
+    }
+    const planSelect = document.getElementById(`adminPlan_${user.id}`);
+    const statusSelect = document.getElementById(`adminStatus_${user.id}`);
+    if (planSelect) planSelect.value = plan;
+    if (statusSelect) statusSelect.value = status;
+    await applyAdminBilling(user.id, email, plan, status);
+    document.getElementById('adminQuickEmail').value = '';
+    await renderAdminSubscriptions();
+  } catch (e) {
+    notifyErrorToAdmin('aplicar plano por email', e);
+    showToast('Não foi possível localizar ou atualizar esse email.', 'error');
+  }
+}
 
 function openAdminPanel() {
   if (currentUserRole !== 'admin') return;
@@ -1569,11 +1770,14 @@ function switchAdminTab(tab) {
   _currentAdminTab = tab;
   document.getElementById('tabPending')?.classList.toggle('active', tab === 'pending');
   document.getElementById('tabAll')?.classList.toggle('active', tab === 'all');
+  document.getElementById('tabSubscriptions')?.classList.toggle('active', tab === 'subscriptions');
   document.getElementById('tabContent')?.classList.toggle('active', tab === 'content');
-  const searchBar = document.getElementById('adminSearchBar');
-  if (searchBar) searchBar.style.display = tab === 'all' ? '' : 'none';
+  refreshAdminToolbar();
+  syncAdminQuickControls();
   if (tab === 'content') {
     renderAdminContent();
+  } else if (tab === 'subscriptions') {
+    renderAdminSubscriptions();
   } else {
     renderAdminUsers();
   }
@@ -1611,6 +1815,7 @@ async function renderAdminUsers() {
       const roleLabel = u.role === 'admin' ? 'Admin' : 'Usuário';
       const statusClass = u.approved ? 'approved' : 'pending';
       const statusLabel = u.approved ? '✓ Aprovado' : '⏳ Pendente';
+      const billing = normalizeBilling(u.role === 'admin' ? { ...(u.billing || {}), plan: 'admin', status: 'ativo' } : (u.billing || {}));
       const created = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—';
       const firstLogin = u.firstLoginAt?.toDate ? u.firstLoginAt.toDate().toLocaleDateString('pt-BR') : (u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—');
       const isCurrentAdmin = u.id === currentUser?.uid;
@@ -1618,19 +1823,77 @@ async function renderAdminUsers() {
         <div class="admin-user-email">${u.email || u.id}${isCurrentAdmin ? ' <span style="color:var(--muted);font-size:9px">(você)</span>' : ''}</div>
         <span class="admin-user-role ${roleClass}">${roleLabel}</span>
         <span class="admin-user-status ${statusClass}">${statusLabel}</span>
+        <span style="font-size:9px;letter-spacing:1px;color:var(--accent)">Plano ${billing.plan.toUpperCase()} · ${billing.status}</span>
         <div class="admin-user-meta-dates">
           <span class="admin-user-meta-date" title="Data de cadastro">📅 assinante desde ${created}</span>
           <span class="admin-user-meta-date" title="Primeiro login">🔑 1º login: ${firstLogin}</span>
         </div>
+        ${_currentAdminTab === 'all' ? `<select id="adminPlan_${u.id}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>` : ''}
+        ${_currentAdminTab === 'all' ? `<select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>` : ''}
+        ${_currentAdminTab === 'all' ? `<button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>` : ''}
         ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-primary" onclick="approveUser('${u.id}')">Aprovar</button>` : ''}
         ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="rejectUser('${u.id}')">Rejeitar</button>` : ''}
         ${u.approved && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="opacity:.5" onclick="revokeUser('${u.id}')">Revogar</button>` : ''}
+        ${_currentAdminTab === 'all' && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}')">Tornar admin</button>` : ''}
+        ${_currentAdminTab === 'all' && u.role === 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}')">Remover admin</button>` : ''}
+        ${_currentAdminTab === 'all' && !isCurrentAdmin ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
       `;
       list.appendChild(row);
     });
   } catch(e) {
     notifyErrorToAdmin('carregar usuários pendentes', e);
     list.innerHTML = `<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar. O administrador foi notificado.</div>`;
+  }
+}
+
+async function renderAdminSubscriptions() {
+  const list = document.getElementById('adminUsersList');
+  list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Carregando assinaturas...</div>';
+  if (!_firebaseDb) {
+    list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Firebase não conectado.</div>';
+    return;
+  }
+  try {
+    const snap = await _firebaseDb.collection('userProfiles').get();
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const search = (document.getElementById('adminSearchInput')?.value || '').trim().toLowerCase();
+    if (search) docs = docs.filter(u => (u.email || '').toLowerCase().includes(search));
+    if (_adminBillingPlanFilter !== 'all') {
+      docs = docs.filter(u => normalizeBilling(u.role === 'admin' ? { ...(u.billing || {}), plan: 'admin', status: 'ativo' } : (u.billing || {})).plan === _adminBillingPlanFilter);
+    }
+    if (_adminBillingStatusFilter !== 'all') {
+      docs = docs.filter(u => normalizeBilling(u.role === 'admin' ? { ...(u.billing || {}), plan: 'admin', status: 'ativo' } : (u.billing || {})).status === _adminBillingStatusFilter);
+    }
+    if (!docs.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Nenhuma assinatura encontrada para este filtro.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    docs
+      .sort((a, b) => (a.email || '').localeCompare(b.email || ''))
+      .forEach(u => {
+        const billing = normalizeBilling(u.role === 'admin' ? { ...(u.billing || {}), plan: 'admin', status: 'ativo' } : (u.billing || {}));
+        const row = document.createElement('div');
+        row.className = 'admin-user-row';
+        const modalities = (billing.allowedModalities || []).join(', ') || '—';
+        const canChangeRole = u.id !== currentUser?.uid;
+        row.innerHTML = `
+          <div class="admin-user-email">${u.email || u.id}</div>
+          <span class="admin-user-role ${u.role === 'admin' ? 'admin' : 'user'}">${u.role === 'admin' ? 'Admin' : 'Usuário'}</span>
+          <span class="admin-user-status ${billing.status === 'ativo' ? 'approved' : 'pending'}">${billing.status}</span>
+          <span style="font-size:9px;letter-spacing:1px;color:var(--muted)">Modalidades: ${modalities}</span>
+          <select id="adminPlan_${u.id}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
+          <select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>
+          <button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>
+          ${u.role !== 'admin' && canChangeRole ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}')">Tornar admin</button>` : ''}
+          ${u.role === 'admin' && canChangeRole ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}')">Remover admin</button>` : ''}
+          ${canChangeRole ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
+        `;
+        list.appendChild(row);
+      });
+  } catch (e) {
+    notifyErrorToAdmin('carregar assinaturas admin', e);
+    list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar assinaturas. O administrador foi notificado.</div>';
   }
 }
 
@@ -1730,7 +1993,7 @@ async function adminViewUser(uid, email) {
   document.getElementById('adminImpersonateEmail').textContent = email;
   document.getElementById('adminImpersonateBar').classList.add('visible');
   db = { teams: {} };
-  await loadDB();
+  await Promise.all([loadDB(), loadBilling()]);
   goHome();
 }
 
@@ -1739,7 +2002,7 @@ async function exitAdminView() {
   _adminViewingEmail = null;
   document.getElementById('adminImpersonateBar').classList.remove('visible');
   db = { teams: {} };
-  await loadDB();
+  await Promise.all([loadDB(), loadBilling()]);
   goHome();
 }
 
@@ -2096,6 +2359,7 @@ async function logoutUser() {
     await _firebaseAuth.signOut();
     db = { teams: {} }; currentTeamId=null; currentGameId=null; currentUserRole=null;
     currentUserTeamName='';
+    currentBilling = normalizeBilling({});
     _adminViewingUid=null; _adminViewingEmail=null;
     document.getElementById('adminBadge').style.display='none';
     document.getElementById('btnAdminPanel').style.display='none';
@@ -2179,7 +2443,7 @@ function showAppForUser(user) {
   document.getElementById('btnPrint').style.display = 'none';
   document.getElementById('btnViewAI').style.display = 'none';
   // Carregar dados do usuário
-  loadDB().then(() => {
+  Promise.all([loadDB(), loadBilling()]).then(() => {
     renderHome();
     renderSharedSection();
     handleHashRoute();
@@ -2199,6 +2463,7 @@ function showAppPublicGuest() {
   document.getElementById('btnPrint').style.display = 'none';
   document.getElementById('btnViewAI').style.display = 'none';
   currentUserTeamName = '';
+  currentBilling = normalizeBilling({});
   try {
     const r = localStorage.getItem(_localDbKey());
     if (r) db = JSON.parse(r);
@@ -2427,10 +2692,10 @@ function renderHomePlanSummary() {
   const valueEl = document.getElementById('homePlanValue');
   const metaEl = document.getElementById('homePlanMeta');
   if (!valueEl || !metaEl) return;
-  valueEl.textContent = planId.toUpperCase();
+  valueEl.textContent = planId === 'admin' ? 'ADMIN MASTER' : planId.toUpperCase();
   const mods = (b.allowedModalities || rule.allowedModalities || []).join(', ');
   const st = b.status || 'pendente';
-  metaEl.textContent = `Status ${st} · Modalidades: ${mods}`;
+  metaEl.textContent = planId === 'admin' ? 'Status ativo · Acesso total liberado em todas as modalidades e funções' : `Status ${st} · Modalidades: ${mods}`;
 }
 
 function openPlansPage(pushHash = true) {
@@ -2462,41 +2727,56 @@ function openPlansPage(pushHash = true) {
       bullets: ['Times ilimitados', '4 modalidades', 'Até 25 participantes por time']
     }
   ];
+  if (isAdminAccount()) {
+    plans.push({
+      id: 'admin',
+      name: 'Admin Master',
+      desc: 'Plano interno com acesso total a todas as funcionalidades e gestão completa do ambiente.',
+      bullets: ['Acesso total', 'Todas as modalidades', 'Gestão irrestrita de usuários e assinaturas'],
+      badge: 'Exclusivo Admin'
+    });
+  }
   const rows = [
-    ['Quantidade de times', 'Até 5', 'Ilimitado', 'Ilimitado'],
-    ['Modalidades simultâneas', '1', '2', '4'],
-    ['Participantes por time', '1 (somente admin)', 'Até 6', 'Até 25'],
-    ['Gestão de participantes', '✕', '✓', '✓'],
-    ['Relatórios públicos', '✕', '✓', '✓'],
-    ['Exportação CSV', '✓', '✓', '✓'],
-    ['Dashboard de temporada', '✓', '✓', '✓'],
-    ['Suporte prioritário', '✕', '✓', '✓']
+    { label: 'Quantidade de times', starter: 'Até 5', pro: 'Ilimitado', club: 'Ilimitado', admin: 'Ilimitado' },
+    { label: 'Modalidades simultâneas', starter: '1', pro: '2', club: '4', admin: 'Todas' },
+    { label: 'Participantes por time', starter: '1 (somente admin)', pro: 'Até 6', club: 'Até 25', admin: 'Ilimitado' },
+    { label: 'Gestão de participantes', starter: '✕', pro: '✓', club: '✓', admin: '✓' },
+    { label: 'Relatórios públicos', starter: '✕', pro: '✓', club: '✓', admin: '✓' },
+    { label: 'Exportação CSV', starter: '✓', pro: '✓', club: '✓', admin: '✓' },
+    { label: 'Dashboard de temporada', starter: '✓', pro: '✓', club: '✓', admin: '✓' },
+    { label: 'Suporte prioritário', starter: '✕', pro: '✓', club: '✓', admin: '✓' }
   ];
+  if (isAdminAccount()) {
+    rows.push({ label: 'Permissões administrativas', starter: '✕', pro: '✕', club: '✕', admin: '✓' });
+  }
   const cls = (plan) => active === plan ? 'active-plan' : '';
   cards.innerHTML = plans.map(p => {
-    const price = _plansBillingCycle === 'anual' ? annualPrice(basePrices[p.id]) : basePrices[p.id];
-    const cycleLabel = _plansBillingCycle === 'anual' ? '/ano' : '/mês';
+    const price = p.id === 'admin' ? null : (_plansBillingCycle === 'anual' ? annualPrice(basePrices[p.id]) : basePrices[p.id]);
+    const cycleLabel = p.id === 'admin' ? '' : (_plansBillingCycle === 'anual' ? '/ano' : '/mês');
     const recommended = p.badge ? 'recommended' : '';
     return `
       <div class="plan-price-card ${recommended}">
         ${p.badge ? `<div class="plan-badge">${p.badge}</div>` : ''}
         <div class="plan-name">${p.name}</div>
-        <div class="plan-price-line"><span class="plan-price">R$ ${price}</span><span class="plan-cycle">${cycleLabel}</span></div>
+        <div class="plan-price-line"><span class="plan-price">${p.id === 'admin' ? 'Acesso Interno' : `R$ ${price}`}</span><span class="plan-cycle">${cycleLabel}</span></div>
         <div class="plan-desc">${p.desc}</div>
         <div class="plan-bullets">${p.bullets.map(x => `<div class="plan-bullet"><span>✓</span>${x}</div>`).join('')}</div>
         <button class="btn ${active===p.id?'btn-primary':''}" onclick="choosePlan('${p.id}');openBillingModal()">${active===p.id?'Plano Atual':'Selecionar Plano'}</button>
       </div>
     `;
   }).join('');
+  const adminColumn = isAdminAccount() ? `<td class="plan-head ${cls('admin')}">Admin Master</td>` : '';
+  const adminPrice = isAdminAccount() ? `<td class="${cls('admin')}">Acesso interno</td>` : '';
   body.innerHTML = `
     <tr>
       <td>Plano</td>
       <td class="plan-head ${cls('starter')}">Starter</td>
       <td class="plan-head ${cls('pro')}">Pro</td>
       <td class="plan-head ${cls('club')}">Club</td>
+      ${adminColumn}
     </tr>
-    <tr><td>Preço ${_plansBillingCycle === 'anual' ? 'anual' : 'mensal'}</td><td class="${cls('starter')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.starter) + '/ano' : basePrices.starter + '/mês'}</td><td class="${cls('pro')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.pro) + '/ano' : basePrices.pro + '/mês'}</td><td class="${cls('club')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.club) + '/ano' : basePrices.club + '/mês'}</td></tr>
-    ${rows.map(r => `<tr><td>${r[0]}</td><td class="${cls('starter')} ${(r[1]==='✓'?'ok':'')} ${(r[1]==='✕'?'no':'')}">${r[1]}</td><td class="${cls('pro')} ${(r[2]==='✓'?'ok':'')} ${(r[2]==='✕'?'no':'')}">${r[2]}</td><td class="${cls('club')} ${(r[3]==='✓'?'ok':'')} ${(r[3]==='✕'?'no':'')}">${r[3]}</td></tr>`).join('')}
+    <tr><td>Preço ${_plansBillingCycle === 'anual' ? 'anual' : 'mensal'}</td><td class="${cls('starter')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.starter) + '/ano' : basePrices.starter + '/mês'}</td><td class="${cls('pro')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.pro) + '/ano' : basePrices.pro + '/mês'}</td><td class="${cls('club')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.club) + '/ano' : basePrices.club + '/mês'}</td>${adminPrice}</tr>
+    ${rows.map(r => `<tr><td>${r.label}</td><td class="${cls('starter')} ${(r.starter==='✓'?'ok':'')} ${(r.starter==='✕'?'no':'')}">${r.starter}</td><td class="${cls('pro')} ${(r.pro==='✓'?'ok':'')} ${(r.pro==='✕'?'no':'')}">${r.pro}</td><td class="${cls('club')} ${(r.club==='✓'?'ok':'')} ${(r.club==='✕'?'no':'')}">${r.club}</td>${isAdminAccount() ? `<td class="${cls('admin')} ${(r.admin==='✓'?'ok':'')} ${(r.admin==='✕'?'no':'')}">${r.admin}</td>` : ''}</tr>`).join('')}
   `;
   document.querySelectorAll('.plans-cycle-btn').forEach(btn => {
     btn.classList.toggle('active', btn.textContent.toLowerCase().includes(_plansBillingCycle));
@@ -2693,7 +2973,8 @@ function _billingKey() {
 const PLAN_RULES = {
   starter: { maxTeams: 5, maxParticipants: 1, maxModalities: 1, allowMemberAdmin: false, allowedModalities: ['5x5'] },
   pro: { maxTeams: Infinity, maxParticipants: 6, maxModalities: 2, allowMemberAdmin: true, allowedModalities: ['5x5', '8x8'] },
-  club: { maxTeams: Infinity, maxParticipants: 25, maxModalities: 4, allowMemberAdmin: true, allowedModalities: ['5x5', '8x8', '9x9', 'Full Pad'] }
+  club: { maxTeams: Infinity, maxParticipants: 25, maxModalities: 4, allowMemberAdmin: true, allowedModalities: ['5x5', '8x8', '9x9', 'Full Pad'] },
+  admin: { maxTeams: Infinity, maxParticipants: Infinity, maxModalities: 4, allowMemberAdmin: true, allowedModalities: ['5x5', '8x8', '9x9', 'Full Pad'] }
 };
 const ALL_MODALITIES = ['5x5', '8x8', '9x9', 'Full Pad'];
 
@@ -2701,15 +2982,95 @@ function getPlanRule(planId) {
   return PLAN_RULES[planId] || PLAN_RULES.starter;
 }
 
+function normalizeBilling(billing = {}) {
+  const rawPlan = String(billing.plan || 'starter').toLowerCase();
+  const plan = PLAN_RULES[rawPlan] ? rawPlan : 'starter';
+  const rule = getPlanRule(plan);
+  const allowed = Array.isArray(billing.allowedModalities) && billing.allowedModalities.length
+    ? billing.allowedModalities.filter(m => ALL_MODALITIES.includes(m)).slice(0, rule.maxModalities)
+    : [...rule.allowedModalities];
+  return {
+    plan,
+    status: billing.status || 'pendente',
+    allowedModalities: allowed.length ? allowed : [...rule.allowedModalities],
+    lastPaid: billing.lastPaid || '',
+    updatedAt: billing.updatedAt || ''
+  };
+}
+
 function getBilling() {
-  try { return JSON.parse(localStorage.getItem(_billingKey()) || '{}'); } catch(e) { return {}; }
+  currentBilling = normalizeBilling(currentBilling);
+  return currentBilling;
 }
 
 function saveBilling(data) {
-  localStorage.setItem(_billingKey(), JSON.stringify(data || {}));
+  currentBilling = normalizeBilling(data || currentBilling || {});
+  const uid = _adminViewingUid || currentUser?.uid || '';
+  const email = (_adminViewingEmail || currentUser?.email || '').toLowerCase();
+
+  if (!uid && !email) return Promise.resolve(currentBilling);
+
+  if (window.location.protocol !== 'file:') {
+    return fetch(`/api/billing/${encodeURIComponent(uid || 'guest')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid, email, billing: currentBilling })
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('Falha ao salvar assinatura no servidor')))
+      .then(json => {
+        currentBilling = normalizeBilling(json.billing || currentBilling);
+        return currentBilling;
+      })
+      .catch(async () => {
+        if (_firebaseDb && uid) {
+          await _firebaseDb.collection('userProfiles').doc(uid).set({ billing: currentBilling }, { merge: true });
+        }
+        return currentBilling;
+      });
+  }
+
+  if (_firebaseDb && uid) {
+    return _firebaseDb.collection('userProfiles').doc(uid).set({ billing: currentBilling }, { merge: true })
+      .then(() => currentBilling)
+      .catch(() => currentBilling);
+  }
+
+  return Promise.resolve(currentBilling);
+}
+
+async function loadBilling() {
+  const uid = _adminViewingUid || currentUser?.uid || '';
+  const email = (_adminViewingEmail || currentUser?.email || '').toLowerCase();
+  if (!uid && !email) {
+    currentBilling = normalizeBilling({});
+    return currentBilling;
+  }
+
+  if (window.location.protocol !== 'file:') {
+    try {
+      const res = await fetch(`/api/billing/${encodeURIComponent(uid || 'guest')}?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const json = await res.json();
+        currentBilling = normalizeBilling(json.billing || {});
+        return currentBilling;
+      }
+    } catch (e) {}
+  }
+
+  if (_firebaseDb && uid) {
+    try {
+      const snap = await _firebaseDb.collection('userProfiles').doc(uid).get();
+      currentBilling = normalizeBilling(snap.data()?.billing || {});
+      return currentBilling;
+    } catch (e) {}
+  }
+
+  currentBilling = normalizeBilling({});
+  return currentBilling;
 }
 
 function getAllowedModalities() {
+  if (isAdminAccount()) return [...ALL_MODALITIES];
   const b = getBilling();
   const rule = getPlanRule(b.plan || 'starter');
   const configured = Array.isArray(b.allowedModalities) && b.allowedModalities.length ? b.allowedModalities : rule.allowedModalities;
@@ -2717,26 +3078,101 @@ function getAllowedModalities() {
 }
 
 function isModalityAllowed(modality) {
+  if (isAdminAccount()) return true;
   const b = getBilling();
   if (b.status !== 'ativo') return true;
   return getAllowedModalities().includes(modality);
 }
 
+function getTeamSubscriptionOwnerUid() {
+  return _adminViewingUid || currentUser?.uid || 'local';
+}
+
+function getTeamSubscriptionDefaultEmail() {
+  return (_adminViewingEmail || currentUser?.email || 'local@panda').toLowerCase();
+}
+
+function getTeamSubscriptionCacheKey(teamId) {
+  return `${getTeamSubscriptionOwnerUid()}::${teamId}`;
+}
+
+function normalizeTeamSubscription(subscription = {}, teamId) {
+  const team = db.teams[teamId] || {};
+  const legacy = team.subscription || {};
+  const adminUid = subscription.adminUid || legacy.adminUid || getTeamSubscriptionOwnerUid();
+  const adminEmail = (subscription.adminEmail || legacy.adminEmail || getTeamSubscriptionDefaultEmail()).toLowerCase();
+  const members = Array.isArray(subscription.members) ? subscription.members : (Array.isArray(legacy.members) ? legacy.members : []);
+  return {
+    adminUid,
+    adminEmail,
+    members: members
+      .filter(member => member && member.email)
+      .map(member => ({ name: (member.name || '').trim(), email: String(member.email || '').trim().toLowerCase() }))
+  };
+}
+
 function ensureTeamSubscription(teamId) {
   const t = db.teams[teamId];
   if (!t) return null;
-  if (!t.subscription) {
-    const adminEmail = currentUser?.email || 'local@panda';
-    const adminUid = currentUser?.uid || 'local';
-    t.subscription = { adminUid, adminEmail, members: [] };
-  }
-  if (!Array.isArray(t.subscription.members)) t.subscription.members = [];
-  if (!t.subscription.adminEmail) t.subscription.adminEmail = currentUser?.email || 'local@panda';
-  if (!t.subscription.adminUid) t.subscription.adminUid = currentUser?.uid || 'local';
+  const key = getTeamSubscriptionCacheKey(teamId);
+  t.subscription = normalizeTeamSubscription(_teamSubscriptionsCache[key] || t.subscription || {}, teamId);
+  _teamSubscriptionsCache[key] = t.subscription;
   return t.subscription;
 }
 
+async function loadTeamSubscription(teamId) {
+  const team = db.teams[teamId];
+  if (!team) return null;
+  const fallback = ensureTeamSubscription(teamId);
+  const ownerUid = getTeamSubscriptionOwnerUid();
+  if (!ownerUid || ownerUid === 'local' || window.location.protocol === 'file:') return fallback;
+  try {
+    const res = await fetch(`/api/team-subscriptions/${encodeURIComponent(ownerUid)}/${encodeURIComponent(teamId)}?adminEmail=${encodeURIComponent(fallback.adminEmail)}`);
+    if (!res.ok) return fallback;
+    const json = await res.json();
+    let subscription = normalizeTeamSubscription(json.subscription || fallback, teamId);
+    const shouldSeedRemote = !json.exists && (fallback.members.length || fallback.adminEmail !== getTeamSubscriptionDefaultEmail());
+    if (shouldSeedRemote) {
+      subscription = await saveTeamSubscription(teamId, fallback);
+    } else {
+      const key = getTeamSubscriptionCacheKey(teamId);
+      _teamSubscriptionsCache[key] = subscription;
+      team.subscription = subscription;
+    }
+    return subscription;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+async function saveTeamSubscription(teamId, subscription) {
+  const team = db.teams[teamId];
+  if (!team) return null;
+  const ownerUid = getTeamSubscriptionOwnerUid();
+  const normalized = normalizeTeamSubscription(subscription, teamId);
+  const key = getTeamSubscriptionCacheKey(teamId);
+  _teamSubscriptionsCache[key] = normalized;
+  team.subscription = normalized;
+  if (!ownerUid || ownerUid === 'local' || window.location.protocol === 'file:') return normalized;
+  try {
+    const res = await fetch(`/api/team-subscriptions/${encodeURIComponent(ownerUid)}/${encodeURIComponent(teamId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: normalized })
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const remote = normalizeTeamSubscription(json.subscription || normalized, teamId);
+      _teamSubscriptionsCache[key] = remote;
+      team.subscription = remote;
+      return remote;
+    }
+  } catch (e) {}
+  return normalized;
+}
+
 function canManageTeamMembers(team) {
+  if (isAdminAccount()) return true;
   const b = getBilling();
   const rule = getPlanRule(b.plan || 'starter');
   if (!rule.allowMemberAdmin || b.status !== 'ativo') return false;
@@ -2745,16 +3181,17 @@ function canManageTeamMembers(team) {
   return sub.adminUid === (currentUser?.uid || 'local') || sub.adminEmail === (currentUser?.email || 'local@panda');
 }
 
-function renderTeamMembers() {
+async function renderTeamMembers() {
   const section = document.getElementById('teamMembersSection');
   const list = document.getElementById('teamMembersList');
   const meta = document.getElementById('teamMembersMeta');
   const form = document.getElementById('teamMembersForm');
   const team = db.teams[currentTeamId];
   if (!section || !list || !team) return;
+  list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:8px;letter-spacing:1px">Carregando participantes...</div>';
   const b = getBilling();
   const rule = getPlanRule(b.plan || 'starter');
-  const sub = ensureTeamSubscription(team.id);
+  const sub = await loadTeamSubscription(team.id) || ensureTeamSubscription(team.id);
   const canManage = !_publicReadonly && canManageTeamMembers(team);
   section.style.display = '';
   form.style.display = canManage ? 'flex' : 'none';
@@ -2769,13 +3206,13 @@ function renderTeamMembers() {
   list.innerHTML = rows.join('');
 }
 
-function addTeamMember() {
+async function addTeamMember() {
   if (_publicReadonly) return;
   const team = db.teams[currentTeamId];
   if (!team) return;
   const b = getBilling();
   const rule = getPlanRule(b.plan || 'starter');
-  if (!rule.allowMemberAdmin || b.status !== 'ativo') {
+  if (!isAdminAccount() && (!rule.allowMemberAdmin || b.status !== 'ativo')) {
     showToast('Seu plano atual não permite participantes adicionais.', 'warning');
     return;
   }
@@ -2783,35 +3220,44 @@ function addTeamMember() {
     showToast('Apenas o administrador da assinatura deste time pode gerenciar participantes.', 'warning');
     return;
   }
-  const sub = ensureTeamSubscription(team.id);
+  const sub = await loadTeamSubscription(team.id) || ensureTeamSubscription(team.id);
   const name = (document.getElementById('memberName').value || '').trim();
   const email = (document.getElementById('memberEmail').value || '').trim().toLowerCase();
   if (!email || !email.includes('@')) { showToast('Informe um email válido.', 'warning'); return; }
   if (sub.members.some(m => m.email === email) || sub.adminEmail === email) { showToast('Este email já está na assinatura do time.', 'warning'); return; }
-  if ((sub.members.length + 1) >= rule.maxParticipants) { showToast('Limite de participantes do plano atingido.', 'warning'); return; }
+  if (!isAdminAccount() && (sub.members.length + 1) >= rule.maxParticipants) { showToast('Limite de participantes do plano atingido.', 'warning'); return; }
   sub.members.push({ name, email });
   document.getElementById('memberName').value = '';
   document.getElementById('memberEmail').value = '';
+  await saveTeamSubscription(team.id, sub);
   saveDB();
-  renderTeamMembers();
+  await renderTeamMembers();
   showToast('Participante adicionado à assinatura do time.', 'success');
 }
 
-function removeTeamMember(index) {
+async function removeTeamMember(index) {
   if (_publicReadonly) return;
   const team = db.teams[currentTeamId];
   if (!team || !canManageTeamMembers(team)) return;
-  const sub = ensureTeamSubscription(team.id);
+  const sub = await loadTeamSubscription(team.id) || ensureTeamSubscription(team.id);
   if (!sub.members[index]) return;
   sub.members.splice(index, 1);
+  await saveTeamSubscription(team.id, sub);
   saveDB();
-  renderTeamMembers();
+  await renderTeamMembers();
 }
 
 function renderBillingModalities() {
   const b = getBilling();
   const planId = b.plan || 'starter';
   const rule = getPlanRule(planId);
+  if (planId === 'admin') {
+    const box = document.getElementById('billingModalities');
+    const help = document.getElementById('billingModalityHelp');
+    box.innerHTML = ALL_MODALITIES.map(mod => `<span class="btn btn-sm" style="border-color:var(--accent);color:var(--accent);cursor:default">${mod}</span>`).join('');
+    help.textContent = 'Plano Admin Master: acesso total liberado em todas as modalidades e funções administrativas.';
+    return;
+  }
   if (!Array.isArray(b.allowedModalities) || !b.allowedModalities.length) {
     b.allowedModalities = [...rule.allowedModalities];
     saveBilling(b);
@@ -2828,6 +3274,7 @@ function renderBillingModalities() {
 function toggleBillingModality(modality) {
   const b = getBilling();
   const planId = b.plan || 'starter';
+  if (planId === 'admin') return;
   const rule = getPlanRule(planId);
   const arr = Array.isArray(b.allowedModalities) && b.allowedModalities.length ? b.allowedModalities : [...rule.allowedModalities];
   const has = arr.includes(modality);
@@ -2848,6 +3295,7 @@ function openBillingModal() {
     { id:'pro', nome:'Pro', preco:'R$ 99/mês', desc:'Comissão técnica · 2 modalidades · até 6 pessoas/time' },
     { id:'club', nome:'Club', preco:'R$ 299/mês', desc:'Clube · todas modalidades · até 25 pessoas/time' }
   ];
+  if (isAdminAccount()) plans.push({ id:'admin', nome:'Admin Master', preco:'Acesso interno', desc:'Plano exclusivo com gestão total, todas as modalidades e todas as funções.' });
   const b = getBilling();
   const rule = getPlanRule(b.plan || 'starter');
   const grid = document.getElementById('billingPlans');
@@ -2866,10 +3314,18 @@ function openBillingModal() {
 }
 
 function choosePlan(planId) {
+  if (planId === 'admin' && !isAdminAccount()) {
+    showToast('Este plano é exclusivo do administrador.', 'warning');
+    return;
+  }
+  if (isAdminAccount() && !_adminViewingUid && planId !== 'admin') {
+    showToast('Sua conta administrativa utiliza o plano Admin Master.', 'warning');
+    return;
+  }
   const b = getBilling();
   const rule = getPlanRule(planId);
   b.plan = planId;
-  b.status = b.status || 'pendente';
+  b.status = planId === 'admin' ? 'ativo' : (b.status || 'pendente');
   b.allowedModalities = [...rule.allowedModalities];
   saveBilling(b);
   openBillingModal();
@@ -3711,7 +4167,7 @@ function setAdminFilter(filter) {
   });
   const map = {all:'aFiltAll',approved:'aFiltApproved',pending_only:'aFiltPending',admin:'aFiltAdmin'};
   const el = document.getElementById(map[filter]); if(el) el.classList.add('active');
-  renderAdminUsers();
+  refreshAdminCurrentTab();
 }
 
 // ── AI CONFIG ──
