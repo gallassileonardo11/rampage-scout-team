@@ -1288,6 +1288,7 @@
       <button class="admin-tab" id="tabAll" onclick="switchAdminTab('all')">Todos os Usuários</button>
       <button class="admin-tab" id="tabSubscriptions" onclick="switchAdminTab('subscriptions')">Assinaturas</button>
       <button class="admin-tab" id="tabContent" onclick="switchAdminTab('content')">Conteúdo</button>
+      <button class="admin-tab" id="tabErrors" onclick="switchAdminTab('errors')" style="color:#f55">Erros</button>
     </div>
     <div id="adminSearchBar" class="admin-search-bar" style="display:none">
       <input class="admin-search-input" id="adminSearchInput" type="text" placeholder="Buscar por email..." oninput="refreshAdminCurrentTab()">
@@ -1351,15 +1352,15 @@
 function notifyErrorToAdmin(context, error) {
   const detail = error?.message || String(error);
   const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : 'não logado';
-  const payload = {
-    userEmail,
-    description: `[ERRO AUTOMÁTICO]\nContexto: ${context}\nErro: ${detail}\nURL: ${window.location.href}\nData: ${new Date().toISOString()}\nUser-Agent: ${navigator.userAgent}`
-  };
-  fetch('/api/report-bug', {
+  const isAdmin = (typeof isAdminAccount === 'function') && isAdminAccount();
+  fetch('/api/admin/log-error', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ context, error: detail, userEmail, url: window.location.href, userAgent: navigator.userAgent, ts: new Date().toISOString() })
   }).catch(() => {});
+  if (isAdmin) {
+    showToast(`❌ [${context}] ${detail}`, 'error', 8000);
+  }
 }
 
 let db = { teams: {} };
@@ -1652,7 +1653,7 @@ async function applyAdminBilling(uid, email, planOverride = null, statusOverride
     await refreshAdminCurrentTab();
   } catch (e) {
     notifyErrorToAdmin('atualizar plano do usuário', e);
-    showToast('Não foi possível atualizar o plano.', 'error');
+    showToast(`Erro ao salvar: ${e.message}`, 'error');
   }
 }
 
@@ -1666,7 +1667,7 @@ async function promoteUserToAdmin(uid, email = '') {
       await refreshAdminCurrentTab();
     } catch (e) {
       notifyErrorToAdmin('promover admin', e);
-      showToast('Não foi possível promover o usuário.', 'error');
+      showToast(`Erro ao promover: ${e.message}`, 'error');
     }
   });
 }
@@ -1681,7 +1682,7 @@ async function demoteAdminToUser(uid, email = '') {
       await refreshAdminCurrentTab();
     } catch (e) {
       notifyErrorToAdmin('rebaixar admin', e);
-      showToast('Não foi possível alterar o papel do usuário.', 'error');
+      showToast(`Erro ao rebaixar: ${e.message}`, 'error');
     }
   });
 }
@@ -1689,6 +1690,7 @@ async function demoteAdminToUser(uid, email = '') {
 let _currentAdminTab = 'pending';
 let _adminBillingPlanFilter = 'all';
 let _adminBillingStatusFilter = 'all';
+let _adminUnreadErrors = 0;
 
 function refreshAdminCurrentTab() {
   if (_currentAdminTab === 'content') return renderAdminContent();
@@ -1779,77 +1781,24 @@ function switchAdminTab(tab) {
   document.getElementById('tabAll')?.classList.toggle('active', tab === 'all');
   document.getElementById('tabSubscriptions')?.classList.toggle('active', tab === 'subscriptions');
   document.getElementById('tabContent')?.classList.toggle('active', tab === 'content');
+  document.getElementById('tabErrors')?.classList.toggle('active', tab === 'errors');
   refreshAdminToolbar();
   syncAdminQuickControls();
   if (tab === 'content') {
     renderAdminContent();
   } else if (tab === 'subscriptions') {
     renderAdminSubscriptions();
+  } else if (tab === 'errors') {
+    renderAdminErrors();
   } else {
     renderAdminUsers();
   }
-}
-
-async function renderAdminUsers() {
-  const list = document.getElementById('adminUsersList');
-  list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Carregando...</div>';
-  if (!_firebaseDb) { list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Firebase não conectado.</div>'; return; }
-  try {
-    const snap = await _firebaseDb.collection('userProfiles').get();
-    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Filtro por tab
-    if (_currentAdminTab === 'pending') {
-      docs = docs.filter(u => !u.approved && u.role !== 'admin');
-    }
-    // Filtro de status (aba "all")
-    if (_currentAdminTab === 'all' && _adminStatusFilter !== 'all') {
-      if (_adminStatusFilter === 'approved') docs = docs.filter(u => u.approved);
-      else if (_adminStatusFilter === 'pending_only') docs = docs.filter(u => !u.approved && u.role !== 'admin');
-      else if (_adminStatusFilter === 'admin') docs = docs.filter(u => u.role === 'admin');
-    }
-    // Busca por email
-    const search = (document.getElementById('adminSearchInput')?.value || '').trim().toLowerCase();
-    if (search) docs = docs.filter(u => (u.email || '').toLowerCase().includes(search));
-    if (!docs.length) {
-      list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Nenhum usuário encontrado.</div>';
-      return;
-    }
-    list.innerHTML = '';
-    docs.forEach(u => {
-      const row = document.createElement('div');
-      row.className = 'admin-user-row';
-      const roleClass = u.role === 'admin' ? 'admin' : 'user';
-      const roleLabel = u.role === 'admin' ? 'Admin' : 'Usuário';
-      const statusClass = u.approved ? 'approved' : 'pending';
-      const statusLabel = u.approved ? '✓ Aprovado' : '⏳ Pendente';
-      const billing = normalizeBilling(u.role === 'admin' ? { ...(u.billing || {}), plan: 'admin', status: 'ativo' } : (u.billing || {}));
-      const created = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—';
-      const firstLogin = u.firstLoginAt?.toDate ? u.firstLoginAt.toDate().toLocaleDateString('pt-BR') : (u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('pt-BR') : '—');
-      const isCurrentAdmin = u.id === currentUser?.uid;
-      row.innerHTML = `
-        <div class="admin-user-email">${u.email || u.id}${isCurrentAdmin ? ' <span style="color:var(--muted);font-size:9px">(você)</span>' : ''}</div>
-        <span class="admin-user-role ${roleClass}">${roleLabel}</span>
-        <span class="admin-user-status ${statusClass}">${statusLabel}</span>
-        <span style="font-size:9px;letter-spacing:1px;color:var(--accent)">Plano ${billing.plan.toUpperCase()} · ${billing.status}</span>
-        <div class="admin-user-meta-dates">
-          <span class="admin-user-meta-date" title="Data de cadastro">📅 assinante desde ${created}</span>
-          <span class="admin-user-meta-date" title="Primeiro login">🔑 1º login: ${firstLogin}</span>
-        </div>
-        <select id="adminPlan_${u.id}" data-role="${u.role || 'user'}" class="admin-search-input" style="max-width:130px;min-width:120px">${getAdminPlanOptions(billing.plan)}</select>
-        <select id="adminStatus_${u.id}" class="admin-search-input" style="max-width:120px;min-width:110px">${getAdminStatusOptions(billing.status)}</select>
-        <button class="btn btn-sm" onclick="applyAdminBilling('${u.id}','${u.email || ''}')">Salvar plano</button>
-        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-primary" onclick="approveUser('${u.id}','${u.email || ''}')">Aprovar</button>` : ''}
-        ${!u.approved && u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="rejectUser('${u.id}')">Rejeitar</button>` : ''}
-        ${u.approved && u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="opacity:.5" onclick="revokeUser('${u.id}','${u.email || ''}')">Revogar</button>` : ''}
-        ${u.role !== 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#f55;color:#f88" onclick="promoteUserToAdmin('${u.id}','${u.email || ''}')">Tornar admin</button>` : ''}
-        ${u.role === 'admin' && !isCurrentAdmin ? `<button class="btn btn-sm" style="border-color:#888;color:#bbb" onclick="demoteAdminToUser('${u.id}','${u.email || ''}')">Remover admin</button>` : ''}
-        ${!isCurrentAdmin ? `<button class="btn btn-sm" style="font-size:9px;padding:4px 10px;flex-shrink:0;border-color:var(--accent2);color:var(--accent2)" onclick="adminViewUser('${u.id}','${(u.email || u.id).replace(/'/g, '&#39;')}')">Acessar</button>` : ''}
-      `;
-      list.appendChild(row);
-    });
-  } catch(e) {
-    notifyErrorToAdmin('carregar usuários pendentes', e);
-    list.innerHTML = `<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar. O administrador foi notificado.</div>`;
+  const errTab = document.getElementById('tabErrors');
+  if (tab !== 'errors' && errTab && _adminUnreadErrors > 0) {
+    errTab.textContent = 'Erros (' + _adminUnreadErrors + ')';
+  } else if (tab === 'errors') {
+    _adminUnreadErrors = 0;
+    if (errTab) errTab.textContent = 'Erros';
   }
 }
 
@@ -1901,6 +1850,58 @@ async function renderAdminSubscriptions() {
   } catch (e) {
     notifyErrorToAdmin('carregar assinaturas admin', e);
     list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar assinaturas. O administrador foi notificado.</div>';
+  }
+}
+
+async function renderAdminErrors() {
+  const list = document.getElementById('adminUsersList');
+  list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:10px;letter-spacing:1px">Carregando erros...</div>';
+  try {
+    const resp = await fetch('/api/admin/errors?limit=200');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const { errors } = await resp.json();
+    if (!errors || !errors.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:16px;letter-spacing:1px">Nenhum erro registrado.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    // botao limpar
+    const clearBtn = document.createElement('div');
+    clearBtn.style.cssText = 'padding:8px 0 12px;display:flex;gap:8px;align-items:center';
+    clearBtn.innerHTML = `<span style="font-size:10px;color:var(--muted);letter-spacing:1px">${errors.length} erro(s) registrado(s)</span>
+      <button class="btn btn-sm btn-danger" style="margin-left:auto" onclick="clearAdminErrors()">Limpar tudo</button>`;
+    list.appendChild(clearBtn);
+    errors.forEach(e => {
+      const row = document.createElement('div');
+      row.className = 'admin-user-row';
+      row.style.cssText = 'border-left:3px solid #f55;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 14px';
+      const ts = e.createdAt || e.ts || '';
+      const dateStr = ts ? new Date(ts).toLocaleString('pt-BR') : '—';
+      row.innerHTML = `
+        <div style="display:flex;width:100%;align-items:center;gap:8px">
+          <span style="font-size:9px;color:#f55;letter-spacing:2px;text-transform:uppercase;font-weight:700">${(e.context||'').slice(0,80)}</span>
+          <span style="font-size:9px;color:var(--muted);margin-left:auto;white-space:nowrap">${dateStr}</span>
+        </div>
+        <div style="font-size:11px;color:#ff8855;word-break:break-all;line-height:1.5">${(e.error||'').slice(0,500)}</div>
+        <div style="display:flex;gap:12px;font-size:9px;color:var(--muted);flex-wrap:wrap">
+          <span>👤 ${e.userEmail||'—'}</span>
+          <span>🔗 ${(e.url||'').slice(0,80)||'—'}</span>
+        </div>`;
+      list.appendChild(row);
+    });
+  } catch (err) {
+    list.innerHTML = '<div style="color:var(--danger);font-size:10px;padding:10px">Erro ao carregar logs: ' + err.message + '</div>';
+  }
+}
+
+async function clearAdminErrors() {
+  try {
+    const resp = await fetch('/api/admin/errors', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    showToast('Logs de erro limpos.', 'success');
+    renderAdminErrors();
+  } catch (err) {
+    showToast('Erro ao limpar: ' + err.message, 'error');
   }
 }
 
