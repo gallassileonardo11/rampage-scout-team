@@ -368,8 +368,8 @@
   .score-sep{color:var(--muted);font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;}
 
   /* ── VIDEO SECTION ── */
-  .video-section{padding:14px 28px 20px;border-top:1px solid var(--border);}
-  .video-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;user-select:none;}
+  .video-section{border-bottom:1px solid var(--border);background:var(--surface2);}
+  .video-header{display:flex;align-items:center;gap:10px;padding:12px 28px;cursor:default;}
   .video-label{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
   .video-toggle-btn{color:var(--muted);font-size:10px;letter-spacing:1px;background:none;border:none;cursor:pointer;transition:color .15s;padding:0;font-family:inherit;}
   .video-toggle-btn:hover{color:var(--accent);}
@@ -378,8 +378,22 @@
   .video-tab:not(:last-child){border-right:none;}
   .video-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(200,241,53,.08);}
   .video-tab:hover:not(.active){border-color:var(--text);color:var(--text);}
+  /* player wrap */
   .video-embed-wrap{position:relative;width:100%;padding-bottom:56.25%;background:#000;border:1px solid var(--border);}
   .video-embed-wrap iframe,.video-embed-wrap video{position:absolute;top:0;left:0;width:100%;height:100%;border:none;}
+  /* size wrapper */
+  #videoInner{padding:14px 28px 18px;transition:max-width .2s;}
+  .video-size-s #videoInner,#videoInner.video-size-s{max-width:480px;}
+  .video-size-m #videoInner,#videoInner.video-size-m{max-width:760px;}
+  .video-size-l #videoInner,#videoInner.video-size-l{max-width:1100px;}
+  .video-size-full #videoInner,#videoInner.video-size-full{max-width:100%;}
+  /* size buttons */
+  .video-size-btns{display:flex;align-items:center;gap:2px;margin-left:auto;}
+  .video-size-btn{border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;padding:4px 10px;cursor:pointer;transition:all .15s;}
+  .video-size-btn:not(:last-child){border-right:none;}
+  .video-size-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(200,241,53,.1);}
+  .video-size-btn:hover:not(.active){border-color:var(--text);color:var(--text);}
+  /* inner elements */
   .video-url-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
   .video-url-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:8px 10px;outline:none;transition:border-color .15s;}
   .video-url-input:focus{border-color:var(--accent);}
@@ -388,7 +402,12 @@
   .video-upload-area{border:2px dashed var(--border);padding:32px;text-align:center;cursor:pointer;transition:all .2s;}
   .video-upload-area:hover,.video-upload-area.drag-over{border-color:var(--accent);background:rgba(200,241,53,.04);}
   .video-upload-label{color:var(--muted);font-size:11px;letter-spacing:1px;}
-  @media(max-width:768px){.video-section{padding-left:14px;padding-right:14px;}.video-url-row{flex-direction:column;align-items:stretch;}}
+  @media(max-width:768px){
+    .video-header{padding:10px 14px;flex-wrap:wrap;}
+    #videoInner{padding:10px 14px 14px;}
+    .video-size-btns{margin-left:0;}
+    .video-url-row{flex-direction:column;align-items:stretch;}
+  }
 
   /* ── NOTES ── */
   .notes-section{padding:14px 28px 20px;border-top:1px solid var(--border);}
@@ -758,6 +777,64 @@
     <button class="btn btn-sm btn-danger" onclick="deleteCurrentGame()" style="margin-left:auto">Excluir Jogo</button>
   </div>
 
+  <!-- VIDEO SECTION -->
+  <div class="video-section" id="videoSection">
+    <div class="video-header">
+      <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1" onclick="toggleVideoSection()">
+        <span class="video-label">🎬 Vídeo do Jogo</span>
+        <button class="video-toggle-btn" id="videoToggleBtn">▶ expandir</button>
+      </div>
+      <div class="video-size-btns" id="videoSizeBtns" style="display:none">
+        <span style="color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-right:4px">Tamanho:</span>
+        <button class="video-size-btn" onclick="setVideoSize('s')" id="vsz-s">P</button>
+        <button class="video-size-btn" onclick="setVideoSize('m')" id="vsz-m">M</button>
+        <button class="video-size-btn active" onclick="setVideoSize('l')" id="vsz-l">G</button>
+        <button class="video-size-btn" onclick="setVideoSize('full')" id="vsz-full">Máx</button>
+      </div>
+    </div>
+    <div id="videoBody" style="display:none">
+      <div id="videoInner" class="video-size-l">
+        <div class="video-tabs">
+          <button class="video-tab active" id="videoTabYT" onclick="switchVideoTab('youtube')">▶ YouTube / Link</button>
+          <button class="video-tab" id="videoTabUp" onclick="switchVideoTab('upload')">⬆ Upload Local</button>
+        </div>
+        <!-- YouTube / URL panel -->
+        <div id="videoYoutubePanel">
+          <div class="video-url-row">
+            <input class="video-url-input" id="videoYtUrl" type="url"
+              placeholder="https://youtube.com/watch?v=... ou youtu.be/..."
+              oninput="loadYoutubeEmbed()">
+            <button class="btn btn-sm" onclick="loadYoutubeFromGameLink()">Usar link do tape</button>
+          </div>
+          <div id="videoYtEmbed">
+            <div class="video-no-link">Insira um link do YouTube acima ou clique em "Usar link do tape"</div>
+          </div>
+        </div>
+        <!-- Upload local panel -->
+        <div id="videoUploadPanel" style="display:none">
+          <div class="video-upload-area" id="videoUploadArea"
+            onclick="document.getElementById('videoFileInput').click()"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleVideoDrop(event)">
+            <div class="video-upload-label">📂 Clique ou arraste um arquivo de vídeo aqui</div>
+            <div style="color:var(--border);font-size:10px;letter-spacing:1px;margin-top:6px">MP4 · MOV · AVI · WebM · MKV</div>
+          </div>
+          <input type="file" id="videoFileInput" accept="video/*" style="display:none" onchange="loadLocalVideo(event)">
+          <div id="videoLocalPlayer" style="display:none;margin-top:12px">
+            <div class="video-embed-wrap">
+              <video id="videoPlayer" controls></video>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+              <span style="color:var(--muted);font-size:10px;letter-spacing:1px" id="videoFileName"></span>
+              <button class="btn btn-sm btn-danger" onclick="clearLocalVideo()" style="margin-left:auto">✕ Remover vídeo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="stats-strip">
     <div class="stat-box"><div class="stat-label">Total Jogadas</div><div class="stat-value" id="statTotal">0</div></div>
     <div class="stat-box"><div class="stat-label">Passes</div><div class="stat-value" id="statPass" style="color:#ff4d00">0</div></div>
@@ -870,53 +947,6 @@
       <button class="btn btn-sm" onclick="document.getElementById('aiPanel').classList.remove('visible')">Fechar</button>
     </div>
     <div class="ai-panel-body" id="aiOutput"></div>
-  </div>
-
-  <!-- VIDEO SECTION -->
-  <div class="video-section" id="videoSection">
-    <div class="video-header" onclick="toggleVideoSection()">
-      <span class="video-label">🎬 Vídeo do Jogo</span>
-      <button class="video-toggle-btn" id="videoToggleBtn">▶ expandir</button>
-    </div>
-    <div id="videoBody" style="display:none">
-      <div class="video-tabs">
-        <button class="video-tab active" id="videoTabYT" onclick="switchVideoTab('youtube')">▶ YouTube / Link</button>
-        <button class="video-tab" id="videoTabUp" onclick="switchVideoTab('upload')">⬆ Upload Local</button>
-      </div>
-      <!-- YouTube / URL panel -->
-      <div id="videoYoutubePanel">
-        <div class="video-url-row">
-          <input class="video-url-input" id="videoYtUrl" type="url"
-            placeholder="https://youtube.com/watch?v=... ou youtu.be/..."
-            oninput="loadYoutubeEmbed()">
-          <button class="btn btn-sm" onclick="loadYoutubeFromGameLink()">Usar link do tape</button>
-        </div>
-        <div id="videoYtEmbed">
-          <div class="video-no-link">Insira um link do YouTube acima ou clique em "Usar link do tape"</div>
-        </div>
-      </div>
-      <!-- Upload local panel -->
-      <div id="videoUploadPanel" style="display:none">
-        <div class="video-upload-area" id="videoUploadArea"
-          onclick="document.getElementById('videoFileInput').click()"
-          ondragover="event.preventDefault();this.classList.add('drag-over')"
-          ondragleave="this.classList.remove('drag-over')"
-          ondrop="handleVideoDrop(event)">
-          <div class="video-upload-label">📂 Clique ou arraste um arquivo de vídeo aqui</div>
-          <div style="color:var(--border);font-size:10px;letter-spacing:1px;margin-top:6px">MP4 · MOV · AVI · WebM · MKV</div>
-        </div>
-        <input type="file" id="videoFileInput" accept="video/*" style="display:none" onchange="loadLocalVideo(event)">
-        <div id="videoLocalPlayer" style="display:none;margin-top:12px">
-          <div class="video-embed-wrap">
-            <video id="videoPlayer" controls></video>
-          </div>
-          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-            <span style="color:var(--muted);font-size:10px;letter-spacing:1px" id="videoFileName"></span>
-            <button class="btn btn-sm btn-danger" onclick="clearLocalVideo()" style="margin-left:auto">✕ Remover vídeo</button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div class="notes-section" id="notesSection">
@@ -2313,8 +2343,14 @@ function _openScoutView() {
   // Video: reset ao abrir novo jogo
   clearLocalVideo();
   _videoExpanded = false;
+  _videoSize = 'l';
   document.getElementById('videoBody').style.display = 'none';
   document.getElementById('videoToggleBtn').textContent = '▶ expandir';
+  document.getElementById('videoSizeBtns').style.display = 'none';
+  const inner = document.getElementById('videoInner');
+  ['video-size-s','video-size-m','video-size-l','video-size-full'].forEach(c => inner.classList.remove(c));
+  inner.classList.add('video-size-l');
+  ['s','m','l','full'].forEach(id => { const b=document.getElementById('vsz-'+id); if(b) b.classList.toggle('active', id==='l'); });
   document.getElementById('videoYtUrl').value = '';
   document.getElementById('videoYtEmbed').innerHTML = '<div class="video-no-link">Insira um link do YouTube acima ou clique em "Usar link do tape"</div>';
   switchVideoTab('youtube');
@@ -3702,11 +3738,24 @@ function handleSearchKey(e) {
 
 // ── VIDEO SECTION ──
 let _videoExpanded = false;
+let _videoSize = 'l';
 function toggleVideoSection() {
   _videoExpanded = !_videoExpanded;
   document.getElementById('videoBody').style.display = _videoExpanded ? 'block' : 'none';
   document.getElementById('videoToggleBtn').textContent = _videoExpanded ? '\u25bc recolher' : '\u25b6 expandir';
+  document.getElementById('videoSizeBtns').style.display = _videoExpanded ? 'flex' : 'none';
   if (_videoExpanded) loadYoutubeFromGameLink();
+}
+
+function setVideoSize(s) {
+  _videoSize = s;
+  const inner = document.getElementById('videoInner');
+  ['video-size-s','video-size-m','video-size-l','video-size-full'].forEach(c => inner.classList.remove(c));
+  inner.classList.add('video-size-' + s);
+  ['s','m','l','full'].forEach(id => {
+    const btn = document.getElementById('vsz-' + id);
+    if (btn) btn.classList.toggle('active', id === s);
+  });
 }
 
 function switchVideoTab(tab) {
