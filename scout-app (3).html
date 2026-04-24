@@ -367,6 +367,29 @@
   .score-input{width:52px!important;text-align:center;}
   .score-sep{color:var(--muted);font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;}
 
+  /* ── VIDEO SECTION ── */
+  .video-section{padding:14px 28px 20px;border-top:1px solid var(--border);}
+  .video-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;user-select:none;}
+  .video-label{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+  .video-toggle-btn{color:var(--muted);font-size:10px;letter-spacing:1px;background:none;border:none;cursor:pointer;transition:color .15s;padding:0;font-family:inherit;}
+  .video-toggle-btn:hover{color:var(--accent);}
+  .video-tabs{display:flex;gap:0;margin-bottom:12px;}
+  .video-tab{border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;padding:5px 16px;cursor:pointer;transition:all .15s;}
+  .video-tab:not(:last-child){border-right:none;}
+  .video-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(200,241,53,.08);}
+  .video-tab:hover:not(.active){border-color:var(--text);color:var(--text);}
+  .video-embed-wrap{position:relative;width:100%;padding-bottom:56.25%;background:#000;border:1px solid var(--border);}
+  .video-embed-wrap iframe,.video-embed-wrap video{position:absolute;top:0;left:0;width:100%;height:100%;border:none;}
+  .video-url-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
+  .video-url-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:8px 10px;outline:none;transition:border-color .15s;}
+  .video-url-input:focus{border-color:var(--accent);}
+  .video-url-input::placeholder{color:var(--muted);}
+  .video-no-link{color:var(--muted);font-size:11px;letter-spacing:1px;padding:28px;text-align:center;border:1px dashed var(--border);}
+  .video-upload-area{border:2px dashed var(--border);padding:32px;text-align:center;cursor:pointer;transition:all .2s;}
+  .video-upload-area:hover,.video-upload-area.drag-over{border-color:var(--accent);background:rgba(200,241,53,.04);}
+  .video-upload-label{color:var(--muted);font-size:11px;letter-spacing:1px;}
+  @media(max-width:768px){.video-section{padding-left:14px;padding-right:14px;}.video-url-row{flex-direction:column;align-items:stretch;}}
+
   /* ── NOTES ── */
   .notes-section{padding:14px 28px 20px;border-top:1px solid var(--border);}
   .notes-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;user-select:none;}
@@ -464,7 +487,7 @@
   /* ── PRINT STYLES ── */
   @media print{
     body{background:#fff!important;color:#000!important;}
-    header,#toastContainer,#loadingOverlay,#searchModal,#modalConfirm,.modal-overlay,.ai-panel,.footer-bar,.ai-type-bar,.ai-custom-bar,.game-bar .btn,.breadcrumb .bc-link,.btn-danger,.btn-ai,.btn-primary,#btnExport,#btnAnalyze,#btnSearch,#btnImport,.del-btn,.dup-btn,.flag-btn,.add-row-btn,.pagination-bar,.charts-strip,.notes-section,#adminImpersonateBar,.games-sort-bar{display:none!important;}
+    header,#toastContainer,#loadingOverlay,#searchModal,#modalConfirm,.modal-overlay,.ai-panel,.footer-bar,.ai-type-bar,.ai-custom-bar,.game-bar .btn,.breadcrumb .bc-link,.btn-danger,.btn-ai,.btn-primary,#btnExport,#btnAnalyze,#btnSearch,#btnImport,.del-btn,.dup-btn,.flag-btn,.add-row-btn,.pagination-bar,.charts-strip,.notes-section,.video-section,#adminImpersonateBar,.games-sort-bar{display:none!important;}
     .view{display:block!important;}
     .view:not(.active){display:none!important;}
     table{min-width:unset!important;font-size:9pt;}
@@ -847,6 +870,53 @@
       <button class="btn btn-sm" onclick="document.getElementById('aiPanel').classList.remove('visible')">Fechar</button>
     </div>
     <div class="ai-panel-body" id="aiOutput"></div>
+  </div>
+
+  <!-- VIDEO SECTION -->
+  <div class="video-section" id="videoSection">
+    <div class="video-header" onclick="toggleVideoSection()">
+      <span class="video-label">🎬 Vídeo do Jogo</span>
+      <button class="video-toggle-btn" id="videoToggleBtn">▶ expandir</button>
+    </div>
+    <div id="videoBody" style="display:none">
+      <div class="video-tabs">
+        <button class="video-tab active" id="videoTabYT" onclick="switchVideoTab('youtube')">▶ YouTube / Link</button>
+        <button class="video-tab" id="videoTabUp" onclick="switchVideoTab('upload')">⬆ Upload Local</button>
+      </div>
+      <!-- YouTube / URL panel -->
+      <div id="videoYoutubePanel">
+        <div class="video-url-row">
+          <input class="video-url-input" id="videoYtUrl" type="url"
+            placeholder="https://youtube.com/watch?v=... ou youtu.be/..."
+            oninput="loadYoutubeEmbed()">
+          <button class="btn btn-sm" onclick="loadYoutubeFromGameLink()">Usar link do tape</button>
+        </div>
+        <div id="videoYtEmbed">
+          <div class="video-no-link">Insira um link do YouTube acima ou clique em "Usar link do tape"</div>
+        </div>
+      </div>
+      <!-- Upload local panel -->
+      <div id="videoUploadPanel" style="display:none">
+        <div class="video-upload-area" id="videoUploadArea"
+          onclick="document.getElementById('videoFileInput').click()"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="handleVideoDrop(event)">
+          <div class="video-upload-label">📂 Clique ou arraste um arquivo de vídeo aqui</div>
+          <div style="color:var(--border);font-size:10px;letter-spacing:1px;margin-top:6px">MP4 · MOV · AVI · WebM · MKV</div>
+        </div>
+        <input type="file" id="videoFileInput" accept="video/*" style="display:none" onchange="loadLocalVideo(event)">
+        <div id="videoLocalPlayer" style="display:none;margin-top:12px">
+          <div class="video-embed-wrap">
+            <video id="videoPlayer" controls></video>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <span style="color:var(--muted);font-size:10px;letter-spacing:1px" id="videoFileName"></span>
+            <button class="btn btn-sm btn-danger" onclick="clearLocalVideo()" style="margin-left:auto">✕ Remover vídeo</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="notes-section" id="notesSection">
@@ -2240,6 +2310,14 @@ function _openScoutView() {
   _notesExpanded = !!(g.notes && g.notes.trim());
   document.getElementById('notesBody').style.display = _notesExpanded ? '' : 'none';
   document.getElementById('notesToggleBtn').textContent = _notesExpanded ? '▼ recolher' : '▶ expandir';
+  // Video: reset ao abrir novo jogo
+  clearLocalVideo();
+  _videoExpanded = false;
+  document.getElementById('videoBody').style.display = 'none';
+  document.getElementById('videoToggleBtn').textContent = '▶ expandir';
+  document.getElementById('videoYtUrl').value = '';
+  document.getElementById('videoYtEmbed').innerHTML = '<div class="video-no-link">Insira um link do YouTube acima ou clique em "Usar link do tape"</div>';
+  switchVideoTab('youtube');
   // Remove old AI history panel so it re-renders fresh
   document.getElementById('aiHistorySection')?.remove();
   _currentPage = 1;
@@ -3620,6 +3698,96 @@ function runSearch(q) {
 function handleSearchKey(e) {
   if (e.key==='Escape') closeSearch();
   if (e.key==='Enter') { const f=document.querySelector('.search-result'); if(f) f.click(); }
+}
+
+// ── VIDEO SECTION ──
+let _videoExpanded = false;
+function toggleVideoSection() {
+  _videoExpanded = !_videoExpanded;
+  document.getElementById('videoBody').style.display = _videoExpanded ? 'block' : 'none';
+  document.getElementById('videoToggleBtn').textContent = _videoExpanded ? '\u25bc recolher' : '\u25b6 expandir';
+  if (_videoExpanded) loadYoutubeFromGameLink();
+}
+
+function switchVideoTab(tab) {
+  const isYT = tab === 'youtube';
+  document.getElementById('videoYoutubePanel').style.display = isYT ? 'block' : 'none';
+  document.getElementById('videoUploadPanel').style.display = isYT ? 'none' : 'block';
+  document.getElementById('videoTabYT').classList.toggle('active', isYT);
+  document.getElementById('videoTabUp').classList.toggle('active', !isYT);
+}
+
+function _getYoutubeId(url) {
+  try {
+    const u = new URL(url.trim());
+    if (u.hostname === 'youtu.be' || u.hostname === 'www.youtu.be')
+      return u.pathname.slice(1).split('?')[0];
+    if (u.hostname.includes('youtube.com')) {
+      const v = u.searchParams.get('v');
+      if (v) return v;
+      const m = u.pathname.match(/\/embed\/([^/?]+)/);
+      if (m) return m[1];
+    }
+  } catch(e) {}
+  return null;
+}
+
+function loadYoutubeEmbed() {
+  const url = document.getElementById('videoYtUrl').value.trim();
+  const container = document.getElementById('videoYtEmbed');
+  if (!url) {
+    container.innerHTML = '<div class="video-no-link">Insira um link do YouTube acima ou clique em "Usar link do tape"</div>';
+    return;
+  }
+  const id = _getYoutubeId(url);
+  if (id) {
+    container.innerHTML = `<div class="video-embed-wrap"><iframe src="https://www.youtube.com/embed/${encodeURIComponent(id)}" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`;
+  } else {
+    container.innerHTML = '<div class="video-no-link" style="color:var(--danger)">Link inválido — use um link do YouTube (youtube.com ou youtu.be).</div>';
+  }
+}
+
+function loadYoutubeFromGameLink() {
+  const link = (document.getElementById('gameLink').value || '').trim();
+  if (!link) return;
+  const id = _getYoutubeId(link);
+  if (!id) return;
+  document.getElementById('videoYtUrl').value = link;
+  loadYoutubeEmbed();
+}
+
+function loadLocalVideo(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const player = document.getElementById('videoPlayer');
+  if (player._blobUrl) URL.revokeObjectURL(player._blobUrl);
+  player._blobUrl = url;
+  player.src = url;
+  document.getElementById('videoFileName').textContent = file.name;
+  document.getElementById('videoLocalPlayer').style.display = 'block';
+  document.getElementById('videoUploadArea').style.display = 'none';
+}
+
+function handleVideoDrop(event) {
+  event.preventDefault();
+  document.getElementById('videoUploadArea').classList.remove('drag-over');
+  const file = event.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('video/')) { showToast('Arquivo inválido. Selecione um vídeo.', 'error'); return; }
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById('videoFileInput').files = dt.files;
+  loadLocalVideo({ target: { files: dt.files } });
+}
+
+function clearLocalVideo() {
+  const player = document.getElementById('videoPlayer');
+  if (player._blobUrl) { URL.revokeObjectURL(player._blobUrl); player._blobUrl = null; }
+  player.src = '';
+  document.getElementById('videoFileInput').value = '';
+  document.getElementById('videoFileName').textContent = '';
+  document.getElementById('videoLocalPlayer').style.display = 'none';
+  document.getElementById('videoUploadArea').style.display = 'block';
 }
 
 // ── NOTES ──
