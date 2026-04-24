@@ -1642,10 +1642,13 @@ async function applyAdminBilling(uid, email, planOverride = null, statusOverride
   try {
     const currentRole = document.getElementById(`adminPlan_${uid}`)?.dataset.role || 'user';
     let profilePatch = {};
+    if (status === 'ativo') {
+      profilePatch.approved = true;
+    }
     if (plan === 'admin') {
-      profilePatch = { role: 'admin', approved: true };
+      profilePatch = { ...profilePatch, role: 'admin', approved: true };
     } else if (currentRole === 'admin' && uid !== currentUser?.uid) {
-      profilePatch = { role: 'user', approved: true };
+      profilePatch = { ...profilePatch, role: 'user', approved: true };
     }
     const persisted = await persistAdminBillingRecord(uid, email, billing, profilePatch);
     if (!persisted) throw new Error('Falha ao salvar plano');
