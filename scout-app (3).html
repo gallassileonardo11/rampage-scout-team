@@ -431,6 +431,36 @@
   .public-banner{padding:8px 14px;background:#281000;border-bottom:1px solid var(--accent2);color:#ffb380;font-size:10px;letter-spacing:1px;display:none;}
   .public-banner.visible{display:block;}
   .plan-card{border:1px solid var(--border);padding:10px;background:var(--bg);}
+  .home-plan-card{margin:16px 28px 0;border:1px solid var(--border);background:var(--surface);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .home-plan-title{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+  .home-plan-value{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--accent);line-height:1;}
+  .plans-page{padding:20px 28px;}
+  .plans-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--accent);margin-bottom:8px;}
+  .plans-sub{color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:14px;}
+  .plans-billing-toggle{display:inline-flex;border:1px solid var(--border);margin-bottom:14px;}
+  .plans-cycle-btn{border:none;border-right:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;padding:7px 14px;cursor:pointer;}
+  .plans-cycle-btn:last-child{border-right:none;}
+  .plans-cycle-btn.active{background:rgba(200,241,53,.1);color:var(--accent);}
+  .plans-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+  .plan-price-card{border:1px solid var(--border);background:var(--surface);padding:14px;position:relative;display:flex;flex-direction:column;gap:8px;}
+  .plan-price-card.recommended{border-color:var(--accent2);box-shadow:inset 0 0 0 1px rgba(255,77,0,.3);}
+  .plan-badge{position:absolute;top:8px;right:8px;background:rgba(255,77,0,.18);border:1px solid var(--accent2);color:var(--accent2);font-size:9px;letter-spacing:1px;padding:2px 6px;text-transform:uppercase;}
+  .plan-name{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:var(--accent);line-height:1;}
+  .plan-price-line{display:flex;align-items:flex-end;gap:6px;}
+  .plan-price{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1;color:var(--text);}
+  .plan-cycle{font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;}
+  .plan-desc{font-size:10px;color:var(--muted);letter-spacing:1px;line-height:1.6;min-height:34px;}
+  .plan-bullets{display:flex;flex-direction:column;gap:3px;margin:2px 0 6px;}
+  .plan-bullet{font-size:10px;color:var(--text);letter-spacing:.5px;}
+  .plan-bullet span{color:var(--accent);margin-right:5px;}
+  .plans-table-wrap{border:1px solid var(--border);overflow:auto;background:var(--surface);}
+  .plans-table{width:100%;min-width:760px;border-collapse:collapse;}
+  .plans-table th,.plans-table td{border-bottom:1px solid var(--border);padding:10px 12px;font-size:11px;letter-spacing:.5px;text-align:left;}
+  .plans-table th{color:var(--muted);font-size:10px;letter-spacing:2px;text-transform:uppercase;background:var(--surface2);}
+  .plans-table td.plan-head{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--accent);}
+  .plans-table td.active-plan{background:rgba(200,241,53,.07);}
+  .plans-table td.ok{color:var(--accent);font-weight:700;}
+  .plans-table td.no{color:var(--muted);}
 
   /* ── SORT ── */
   th.sortable{cursor:pointer;user-select:none;transition:color .12s;}
@@ -535,7 +565,9 @@
     header{padding:10px 14px;}
     .logo span{display:none;}
     #btnExport{display:none!important;}
-    .home-hero,.table-section,.footer-bar,.breadcrumb,.team-view-header,.notes-section,.team-dashboard{padding-left:14px;padding-right:14px;}
+    .home-hero,.table-section,.footer-bar,.breadcrumb,.team-view-header,.notes-section,.team-dashboard,.plans-page{padding-left:14px;padding-right:14px;}
+    .home-plan-card{margin-left:14px;margin-right:14px;}
+    .plans-cards{grid-template-columns:1fr;}
     .game-bar{padding:10px 14px;gap:6px;}
     .ai-type-bar{padding:8px 14px;}
     .ai-panel{margin:0 14px 14px;}
@@ -628,6 +660,8 @@
     <div id="authNameRow" style="display:none">
       <label class="login-label">Nome</label>
       <input class="login-input" type="text" id="authName" placeholder="Seu nome">
+      <label class="login-label">Nome do Time</label>
+      <input class="login-input" type="text" id="authTeamName" placeholder="Ex: Panthers FA">
     </div>
     <label class="login-label">Email</label>
     <input class="login-input" type="email" id="authEmail" placeholder="seu@email.com" autocomplete="email">
@@ -656,7 +690,7 @@
   <div class="logo">P.A.N.D.A. <span>// Programa de Análise e Neutralização de Decisões Adversárias</span></div>
   <div class="header-right" id="headerRight">
     <button class="btn btn-sm" id="btnInstallApp" onclick="promptInstallApp()" title="Instalar app" style="display:none">⬇ Instalar</button>
-    <button class="btn btn-sm" id="btnBilling" onclick="openBillingModal()" title="Planos e pagamento">💳 Planos</button>
+    <button class="btn btn-sm" id="btnBilling" onclick="openPlansPage()" title="Planos e pagamento">💳 Planos</button>
     <button class="btn btn-sm" id="btnConfig" onclick="openConfigModal()" title="Configurar chave de API Groq" style="display:none">⚙ Config</button>
     <button class="btn btn-sm" id="btnSearch" onclick="openSearch()" title="Busca global (Ctrl+K)" style="display:none">🔍 Buscar</button>
     <button class="btn btn-sm" id="btnViewAI" onclick="viewLastAI()" style="display:none" title="Ver última análise IA">📄 Ver Análise</button>
@@ -678,8 +712,20 @@
 <!-- VIEW: HOME -->
 <div class="view" id="view-home">
   <div class="home-hero">
+    <div id="homeOwnerTeam" style="color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;margin-bottom:6px;display:none">—</div>
     <div class="home-title">Times Adversários</div>
     <button class="btn btn-primary" onclick="openNewTeamModal()">+ Novo Time</button>
+  </div>
+  <div class="home-plan-card" id="homePlanCard">
+    <div>
+      <div class="home-plan-title">Plano Atual</div>
+      <div class="home-plan-value" id="homePlanValue">STARTER</div>
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:4px" id="homePlanMeta">Status pendente</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="openBillingModal()">Gerenciar plano</button>
+      <button class="btn btn-sm" onclick="openPlansPage()">Ver tabela de benefícios</button>
+    </div>
   </div>
   <div id="teamsContainer"></div>
   <div id="sharedSection" style="display:none">
@@ -687,6 +733,41 @@
       <div class="shared-section-title">Times Compartilhados Comigo</div>
     </div>
     <div id="sharedTeamsContainer"></div>
+  </div>
+</div>
+
+<!-- VIEW: PLANS -->
+<div class="view" id="view-plans">
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="goHome()">Times</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Planos</span>
+  </div>
+  <div class="plans-page">
+    <div class="plans-title">Escolha o Plano Ideal</div>
+    <div class="plans-sub">Modelo no padrão de plataformas SaaS: cartões de preço, destaque de plano recomendado e comparativo de benefícios.</div>
+    <div class="plans-billing-toggle" id="plansBillingToggle">
+      <button class="plans-cycle-btn active" onclick="setPlansCycle('mensal')">Mensal</button>
+      <button class="plans-cycle-btn" onclick="setPlansCycle('anual')">Anual <span style="color:var(--accent)">-20%</span></button>
+    </div>
+    <div class="plans-cards" id="plansCards"></div>
+    <div class="plans-table-wrap">
+      <table class="plans-table">
+        <thead>
+          <tr>
+            <th>Recursos</th>
+            <th>Starter</th>
+            <th>Pro</th>
+            <th>Club</th>
+          </tr>
+        </thead>
+        <tbody id="plansTableBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="openBillingModal()">Gerenciar pagamento</button>
+      <button class="btn" onclick="goHome()">Voltar</button>
+    </div>
   </div>
 </div>
 
@@ -705,6 +786,7 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn" id="btnShareTeam" onclick="openShareModal()" style="display:none">👤 Compartilhar</button>
       <button class="btn btn-primary" id="btnNewGame" onclick="openNewGameModal()">+ Novo Jogo</button>
+      <button class="btn" id="btnEditTeam" onclick="openEditTeamModal()">Editar Time</button>
       <button class="btn btn-danger" id="btnDeleteTeam" onclick="deleteCurrentTeam()">Excluir Time</button>
     </div>
   </div>
@@ -718,6 +800,16 @@
       <button class="btn btn-sm" onclick="addRosterPlayer()">+ Adicionar</button>
     </div>
     <div id="rosterList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+  <div class="team-dashboard" id="teamMembersSection" style="display:none;border-top:1px solid var(--border)">
+    <div class="team-dashboard-title">🔐 Participantes da Assinatura do Time</div>
+    <div id="teamMembersMeta" style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px" id="teamMembersForm">
+      <input class="admin-search-input" id="memberName" placeholder="Nome" style="min-width:160px">
+      <input class="admin-search-input" id="memberEmail" placeholder="email@dominio.com" style="min-width:220px">
+      <button class="btn btn-sm" onclick="addTeamMember()">+ Adicionar participante</button>
+    </div>
+    <div id="teamMembersList" style="display:flex;flex-direction:column;gap:6px"></div>
   </div>
   <div class="games-sort-bar">
     <span class="games-sort-label">Ordenar:</span>
@@ -1059,6 +1151,9 @@
   <div class="modal" style="width:640px;max-width:96vw;max-height:86vh;overflow:auto">
     <div class="modal-title">💳 Planos P.A.N.D.A.</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px" id="billingPlans"></div>
+    <label>Modalidades liberadas no plano</label>
+    <div id="billingModalities" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="billingModalityHelp" style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:10px"></div>
     <label>Status da assinatura</label>
     <div id="billingStatus" style="border:1px solid var(--border);padding:10px;background:var(--bg);font-size:11px;letter-spacing:1px;color:var(--muted)"></div>
     <label style="margin-top:12px">Pagamento via PIX</label>
@@ -1071,7 +1166,10 @@
       </div>
       <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:8px">Obs.: aprovação automática simulada nesta versão local.</div>
     </div>
-    <div class="modal-actions"><button class="btn" onclick="closeModal('modalBilling')">Fechar</button></div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="closeModal('modalBilling');openPlansPage()">Abrir página de planos</button>
+      <button class="btn" onclick="closeModal('modalBilling')">Fechar</button>
+    </div>
   </div>
 </div>
 
@@ -1092,14 +1190,14 @@
 <!-- MODAL: Novo Time -->
 <div class="modal-overlay" id="modalTeam">
   <div class="modal">
-    <div class="modal-title">Novo Time Adversário</div>
+    <div class="modal-title" id="modalTeamTitle">Novo Time Adversário</div>
     <label>Nome do Time</label>
     <input type="text" id="newTeamName" placeholder="ex: Spartans">
     <label>Liga / Campeonato</label>
     <input type="text" id="newTeamLeague" placeholder="ex: LAAB 2026">
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalTeam')">Cancelar</button>
-      <button class="btn btn-primary" onclick="createTeam()">Criar Time</button>
+      <button class="btn btn-primary" id="modalTeamSaveBtn" onclick="saveTeamModal()">Criar Time</button>
     </div>
   </div>
 </div>
@@ -1247,10 +1345,14 @@ let db = { teams: {} };
 let currentTeamId = null;
 let currentGameId = null;
 let currentUser = null; // Firebase Auth user
+let currentUserTeamName = '';
+let _pendingTeamName = '';
+let _teamModalEditId = null;
 let _publicReadonly = false;
 let _installPrompt = null;
 let _diagramColor = '#c8f135';
 let _diagramDrawing = false;
+let _plansBillingCycle = 'mensal';
 
 const DOWN = ['1º Down','2º Down','3º Down','4º Down','Extra Point'];
 const TYPE = ['Passe','Corrida','Penalidade','Turnover','Punt/Kick'];
@@ -1347,9 +1449,11 @@ async function ensureUserProfile(user) {
   const snap = await ref.get().catch(() => null);
   if (!snap || !snap.exists) {
     // Perfil novo — disparar notificações
+    const teamName = (_pendingTeamName || '').trim();
     await ref.set({
       email: user.email,
       displayName: user.displayName || '',
+      teamName: teamName,
       approved: isAdmin ? true : false,
       role: isAdmin ? 'admin' : 'user',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1374,14 +1478,18 @@ async function ensureUserProfile(user) {
     }
   } else if (isAdmin && snap.data().role !== 'admin') {
     await ref.update({ role: 'admin', approved: true }).catch(() => {});
+  } else if (_pendingTeamName && !snap.data()?.teamName) {
+    await ref.update({ teamName: _pendingTeamName }).catch(() => {});
   }
+  _pendingTeamName = '';
 }
 
 async function checkApproval(user) {
-  if (!_firebaseDb) { currentUserRole = 'user'; showAppForUser(user); return; }
+  if (!_firebaseDb) { currentUserRole = 'user'; currentUserTeamName = ''; showAppForUser(user); return; }
   try {
     const snap = await _firebaseDb.collection('userProfiles').doc(user.uid).get();
     const data = snap.exists ? snap.data() : {};
+    currentUserTeamName = data.teamName || '';
     currentUserRole = data.role === 'admin' ? 'admin' : 'user';
     if (currentUserRole === 'admin' || data.approved === true) {
       hidePendingScreen();
@@ -1390,6 +1498,7 @@ async function checkApproval(user) {
       showPendingScreen(user);
     }
   } catch(e) {
+    currentUserTeamName = '';
     currentUserRole = 'user';
     showPendingScreen(user);
   }
@@ -1834,6 +1943,7 @@ function openSharedTeam(ownerUid, teamId, role, ownerEmail) {
       // Atualizar visibilidade dos botões conforme papel
       const canEdit = role === 'editor';
       document.getElementById('btnNewGame').style.display = canEdit ? '' : 'none';
+      document.getElementById('btnEditTeam').style.display = 'none';
       document.getElementById('btnDeleteTeam').style.display = 'none';
       document.getElementById('btnShareTeam').style.display = 'none';
       // Usar dados locais temporários do time compartilhado
@@ -1878,6 +1988,7 @@ function toggleAuthMode() {
   document.getElementById('authConfirmRow').style.display = isReg ? '' : 'none';
   document.getElementById('btnForgotPassword').style.display = isReg ? 'none' : '';
   document.getElementById('authConfirmPassword').value = '';
+  document.getElementById('authTeamName').value = '';
   document.getElementById('authPasswordMatch').textContent = '';
   document.getElementById('authError').textContent = '';
 }
@@ -1887,15 +1998,18 @@ async function submitAuth() {
   const email    = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   const name     = document.getElementById('authName').value.trim();
+  const teamName = document.getElementById('authTeamName').value.trim();
   const errEl    = document.getElementById('authError');
   errEl.textContent = '';
   if (!email || !password) { errEl.textContent = 'Preencha email e senha.'; return; }
   if (_authMode === 'register') {
     const confirmPw = document.getElementById('authConfirmPassword').value;
     if (password !== confirmPw) { errEl.textContent = 'As senhas não coincidem.'; return; }
+    if (!teamName) { errEl.textContent = 'Informe o nome do seu time.'; return; }
   }
   try {
     if (_authMode === 'register') {
+      _pendingTeamName = teamName;
       const cred = await _firebaseAuth.createUserWithEmailAndPassword(email, password);
       if (name) await cred.user.updateProfile({ displayName: name });
       // Enviar email de verificação Firebase
@@ -1981,6 +2095,7 @@ async function logoutUser() {
     if (_pendingListener) { _pendingListener(); _pendingListener = null; }
     await _firebaseAuth.signOut();
     db = { teams: {} }; currentTeamId=null; currentGameId=null; currentUserRole=null;
+    currentUserTeamName='';
     _adminViewingUid=null; _adminViewingEmail=null;
     document.getElementById('adminBadge').style.display='none';
     document.getElementById('btnAdminPanel').style.display='none';
@@ -2083,6 +2198,7 @@ function showAppPublicGuest() {
   document.getElementById('btnImport').style.display = 'none';
   document.getElementById('btnPrint').style.display = 'none';
   document.getElementById('btnViewAI').style.display = 'none';
+  currentUserTeamName = '';
   try {
     const r = localStorage.getItem(_localDbKey());
     if (r) db = JSON.parse(r);
@@ -2200,9 +2316,15 @@ function setHash(hash) {
 
 function handleHashRoute() {
   const hash = window.location.hash || '#/';
+  const mplans = hash.match(/^#\/plans$/);
   const mp = hash.match(/^#\/public\/([^\/]+)$/);
   const m2 = hash.match(/^#\/team\/([^\/]+)\/game\/([^\/]+)$/);
   const m1 = hash.match(/^#\/team\/([^\/]+)$/);
+  if (mplans) {
+    _publicReadonly = false;
+    openPlansPage(false);
+    return;
+  }
   if (mp) {
     openPublicGameByToken(mp[1]);
     return;
@@ -2267,6 +2389,16 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 // HOME
 // ════════════════════════════════════
 function renderHome() {
+  renderHomePlanSummary();
+  const ownerEl = document.getElementById('homeOwnerTeam');
+  if (ownerEl) {
+    if (currentUserTeamName) {
+      ownerEl.textContent = currentUserTeamName;
+      ownerEl.style.display = '';
+    } else {
+      ownerEl.style.display = 'none';
+    }
+  }
   const c = document.getElementById('teamsContainer');
   const teams = Object.values(db.teams);
   if (!teams.length) {
@@ -2288,22 +2420,163 @@ function renderHome() {
   c.innerHTML = html;
 }
 
+function renderHomePlanSummary() {
+  const b = getBilling();
+  const planId = b.plan || 'starter';
+  const rule = getPlanRule(planId);
+  const valueEl = document.getElementById('homePlanValue');
+  const metaEl = document.getElementById('homePlanMeta');
+  if (!valueEl || !metaEl) return;
+  valueEl.textContent = planId.toUpperCase();
+  const mods = (b.allowedModalities || rule.allowedModalities || []).join(', ');
+  const st = b.status || 'pendente';
+  metaEl.textContent = `Status ${st} · Modalidades: ${mods}`;
+}
+
+function openPlansPage(pushHash = true) {
+  const b = getBilling();
+  const active = (b.plan || 'starter').toLowerCase();
+  const cards = document.getElementById('plansCards');
+  const body = document.getElementById('plansTableBody');
+  if (!body || !cards) return;
+  const basePrices = { starter: 49, pro: 99, club: 299 };
+  const annualPrice = (m) => Math.round((m * 12 * 0.8));
+  const plans = [
+    {
+      id: 'starter',
+      name: 'Starter',
+      desc: 'Para técnico individual e operação inicial.',
+      bullets: ['Até 5 times', '1 modalidade', '1 usuário administrador']
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      desc: 'Para comissões técnicas que precisam escalar.',
+      bullets: ['Times ilimitados', '2 modalidades', 'Até 6 participantes por time'],
+      badge: 'Mais popular'
+    },
+    {
+      id: 'club',
+      name: 'Club',
+      desc: 'Para clubes com operação completa e multi-equipe.',
+      bullets: ['Times ilimitados', '4 modalidades', 'Até 25 participantes por time']
+    }
+  ];
+  const rows = [
+    ['Quantidade de times', 'Até 5', 'Ilimitado', 'Ilimitado'],
+    ['Modalidades simultâneas', '1', '2', '4'],
+    ['Participantes por time', '1 (somente admin)', 'Até 6', 'Até 25'],
+    ['Gestão de participantes', '✕', '✓', '✓'],
+    ['Relatórios públicos', '✕', '✓', '✓'],
+    ['Exportação CSV', '✓', '✓', '✓'],
+    ['Dashboard de temporada', '✓', '✓', '✓'],
+    ['Suporte prioritário', '✕', '✓', '✓']
+  ];
+  const cls = (plan) => active === plan ? 'active-plan' : '';
+  cards.innerHTML = plans.map(p => {
+    const price = _plansBillingCycle === 'anual' ? annualPrice(basePrices[p.id]) : basePrices[p.id];
+    const cycleLabel = _plansBillingCycle === 'anual' ? '/ano' : '/mês';
+    const recommended = p.badge ? 'recommended' : '';
+    return `
+      <div class="plan-price-card ${recommended}">
+        ${p.badge ? `<div class="plan-badge">${p.badge}</div>` : ''}
+        <div class="plan-name">${p.name}</div>
+        <div class="plan-price-line"><span class="plan-price">R$ ${price}</span><span class="plan-cycle">${cycleLabel}</span></div>
+        <div class="plan-desc">${p.desc}</div>
+        <div class="plan-bullets">${p.bullets.map(x => `<div class="plan-bullet"><span>✓</span>${x}</div>`).join('')}</div>
+        <button class="btn ${active===p.id?'btn-primary':''}" onclick="choosePlan('${p.id}');openBillingModal()">${active===p.id?'Plano Atual':'Selecionar Plano'}</button>
+      </div>
+    `;
+  }).join('');
+  body.innerHTML = `
+    <tr>
+      <td>Plano</td>
+      <td class="plan-head ${cls('starter')}">Starter</td>
+      <td class="plan-head ${cls('pro')}">Pro</td>
+      <td class="plan-head ${cls('club')}">Club</td>
+    </tr>
+    <tr><td>Preço ${_plansBillingCycle === 'anual' ? 'anual' : 'mensal'}</td><td class="${cls('starter')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.starter) + '/ano' : basePrices.starter + '/mês'}</td><td class="${cls('pro')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.pro) + '/ano' : basePrices.pro + '/mês'}</td><td class="${cls('club')}">R$ ${_plansBillingCycle === 'anual' ? annualPrice(basePrices.club) + '/ano' : basePrices.club + '/mês'}</td></tr>
+    ${rows.map(r => `<tr><td>${r[0]}</td><td class="${cls('starter')} ${(r[1]==='✓'?'ok':'')} ${(r[1]==='✕'?'no':'')}">${r[1]}</td><td class="${cls('pro')} ${(r[2]==='✓'?'ok':'')} ${(r[2]==='✕'?'no':'')}">${r[2]}</td><td class="${cls('club')} ${(r[3]==='✓'?'ok':'')} ${(r[3]==='✕'?'no':'')}">${r[3]}</td></tr>`).join('')}
+  `;
+  document.querySelectorAll('.plans-cycle-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(_plansBillingCycle));
+  });
+  showView('plans');
+  if (pushHash) setHash('#/plans');
+}
+
+function setPlansCycle(cycle) {
+  _plansBillingCycle = cycle;
+  openPlansPage(false);
+}
+
 function openNewTeamModal() {
+  _teamModalEditId = null;
+  document.getElementById('modalTeamTitle').textContent = 'Novo Time Adversário';
+  document.getElementById('modalTeamSaveBtn').textContent = 'Criar Time';
   document.getElementById('newTeamName').value = '';
   document.getElementById('newTeamLeague').value = '';
   openModal('modalTeam');
   setTimeout(() => document.getElementById('newTeamName').focus(), 60);
 }
 
+function openEditTeamModal() {
+  if (!currentTeamId || _publicReadonly || sharedContext) return;
+  const t = db.teams[currentTeamId];
+  if (!t) return;
+  _teamModalEditId = currentTeamId;
+  document.getElementById('modalTeamTitle').textContent = 'Editar Time Adversário';
+  document.getElementById('modalTeamSaveBtn').textContent = 'Salvar Alterações';
+  document.getElementById('newTeamName').value = t.name || '';
+  document.getElementById('newTeamLeague').value = t.league || '';
+  openModal('modalTeam');
+  setTimeout(() => document.getElementById('newTeamName').focus(), 60);
+}
+
+function saveTeamModal() {
+  if (_teamModalEditId) updateTeamInfo(_teamModalEditId);
+  else createTeam();
+}
+
 function createTeam() {
   const name = document.getElementById('newTeamName').value.trim();
   if (!name) { showToast('Informe o nome do time.', 'error'); return; }
   const id = 'team_' + Date.now();
-  db.teams[id] = { id, name, league: document.getElementById('newTeamLeague').value.trim(), games: {}, roster: [] };
+  const adminEmail = currentUser?.email || 'local@panda';
+  const adminUid = currentUser?.uid || 'local';
+  db.teams[id] = {
+    id,
+    name,
+    league: document.getElementById('newTeamLeague').value.trim(),
+    games: {},
+    roster: [],
+    subscription: { adminUid, adminEmail, members: [] }
+  };
   saveDB();
   closeModal('modalTeam');
   showToast(`Time “${name}” criado.`, 'success');
   openTeam(id);
+}
+
+function updateTeamInfo(teamId) {
+  const t = db.teams[teamId];
+  if (!t) return;
+  const name = document.getElementById('newTeamName').value.trim();
+  const league = document.getElementById('newTeamLeague').value.trim();
+  if (!name) { showToast('Informe o nome do time.', 'error'); return; }
+  t.name = name;
+  t.league = league;
+  saveDB();
+  closeModal('modalTeam');
+  _teamModalEditId = null;
+  showToast('Informações do time atualizadas.', 'success');
+  if (currentTeamId === teamId) {
+    document.getElementById('bc-team-name').textContent = t.name;
+    document.getElementById('tvName').textContent = t.name;
+    document.getElementById('tvMeta').textContent = t.league || '';
+    renderGames();
+  }
+  renderHome();
 }
 
 function deleteTeam(id) {
@@ -2320,14 +2593,17 @@ function openTeam(teamId) {
   sharedContext = null;
   currentTeamId = teamId;
   const t = db.teams[teamId];
+  ensureTeamSubscription(teamId);
   document.getElementById('bc-team-name').textContent = t.name;
   document.getElementById('tvName').textContent = t.name;
   document.getElementById('tvMeta').textContent = t.league || '';
   // Botões para time próprio
   document.getElementById('btnShareTeam').style.display = _firebaseDb && currentUser ? '' : 'none';
   document.getElementById('btnNewGame').style.display = '';
+  document.getElementById('btnEditTeam').style.display = '';
   document.getElementById('btnDeleteTeam').style.display = '';
   renderRoster();
+  renderTeamMembers();
   renderTeamDashboard();
   renderGames();
   showView('team');
@@ -2414,6 +2690,17 @@ function _billingKey() {
   return 'panda_billing_' + uid;
 }
 
+const PLAN_RULES = {
+  starter: { maxTeams: 5, maxParticipants: 1, maxModalities: 1, allowMemberAdmin: false, allowedModalities: ['5x5'] },
+  pro: { maxTeams: Infinity, maxParticipants: 6, maxModalities: 2, allowMemberAdmin: true, allowedModalities: ['5x5', '8x8'] },
+  club: { maxTeams: Infinity, maxParticipants: 25, maxModalities: 4, allowMemberAdmin: true, allowedModalities: ['5x5', '8x8', '9x9', 'Full Pad'] }
+};
+const ALL_MODALITIES = ['5x5', '8x8', '9x9', 'Full Pad'];
+
+function getPlanRule(planId) {
+  return PLAN_RULES[planId] || PLAN_RULES.starter;
+}
+
 function getBilling() {
   try { return JSON.parse(localStorage.getItem(_billingKey()) || '{}'); } catch(e) { return {}; }
 }
@@ -2422,13 +2709,147 @@ function saveBilling(data) {
   localStorage.setItem(_billingKey(), JSON.stringify(data || {}));
 }
 
+function getAllowedModalities() {
+  const b = getBilling();
+  const rule = getPlanRule(b.plan || 'starter');
+  const configured = Array.isArray(b.allowedModalities) && b.allowedModalities.length ? b.allowedModalities : rule.allowedModalities;
+  return configured.filter(m => ALL_MODALITIES.includes(m));
+}
+
+function isModalityAllowed(modality) {
+  const b = getBilling();
+  if (b.status !== 'ativo') return true;
+  return getAllowedModalities().includes(modality);
+}
+
+function ensureTeamSubscription(teamId) {
+  const t = db.teams[teamId];
+  if (!t) return null;
+  if (!t.subscription) {
+    const adminEmail = currentUser?.email || 'local@panda';
+    const adminUid = currentUser?.uid || 'local';
+    t.subscription = { adminUid, adminEmail, members: [] };
+  }
+  if (!Array.isArray(t.subscription.members)) t.subscription.members = [];
+  if (!t.subscription.adminEmail) t.subscription.adminEmail = currentUser?.email || 'local@panda';
+  if (!t.subscription.adminUid) t.subscription.adminUid = currentUser?.uid || 'local';
+  return t.subscription;
+}
+
+function canManageTeamMembers(team) {
+  const b = getBilling();
+  const rule = getPlanRule(b.plan || 'starter');
+  if (!rule.allowMemberAdmin || b.status !== 'ativo') return false;
+  const sub = ensureTeamSubscription(team.id);
+  if (!sub) return false;
+  return sub.adminUid === (currentUser?.uid || 'local') || sub.adminEmail === (currentUser?.email || 'local@panda');
+}
+
+function renderTeamMembers() {
+  const section = document.getElementById('teamMembersSection');
+  const list = document.getElementById('teamMembersList');
+  const meta = document.getElementById('teamMembersMeta');
+  const form = document.getElementById('teamMembersForm');
+  const team = db.teams[currentTeamId];
+  if (!section || !list || !team) return;
+  const b = getBilling();
+  const rule = getPlanRule(b.plan || 'starter');
+  const sub = ensureTeamSubscription(team.id);
+  const canManage = !_publicReadonly && canManageTeamMembers(team);
+  section.style.display = '';
+  form.style.display = canManage ? 'flex' : 'none';
+  const count = sub.members.length + 1;
+  meta.innerHTML = `Admin: <b style="color:var(--accent)">${sub.adminEmail}</b> · Participantes: <b style="color:var(--accent)">${count}</b>/<b>${rule.maxParticipants === Infinity ? '∞' : rule.maxParticipants}</b> · Plano: ${(b.plan || 'starter').toUpperCase()}`;
+  const rows = [];
+  rows.push(`<div class="share-member-row"><div class="share-member-email">${sub.adminEmail}</div><div class="share-member-role">ADMIN</div></div>`);
+  sub.members.forEach((m, i) => {
+    const del = canManage ? `<button class="share-member-del" title="Remover" onclick="removeTeamMember(${i})">×</button>` : '';
+    rows.push(`<div class="share-member-row"><div class="share-member-email">${m.name ? m.name + ' · ' : ''}${m.email}</div><div class="share-member-role">MEMBRO</div>${del}</div>`);
+  });
+  list.innerHTML = rows.join('');
+}
+
+function addTeamMember() {
+  if (_publicReadonly) return;
+  const team = db.teams[currentTeamId];
+  if (!team) return;
+  const b = getBilling();
+  const rule = getPlanRule(b.plan || 'starter');
+  if (!rule.allowMemberAdmin || b.status !== 'ativo') {
+    showToast('Seu plano atual não permite participantes adicionais.', 'warning');
+    return;
+  }
+  if (!canManageTeamMembers(team)) {
+    showToast('Apenas o administrador da assinatura deste time pode gerenciar participantes.', 'warning');
+    return;
+  }
+  const sub = ensureTeamSubscription(team.id);
+  const name = (document.getElementById('memberName').value || '').trim();
+  const email = (document.getElementById('memberEmail').value || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) { showToast('Informe um email válido.', 'warning'); return; }
+  if (sub.members.some(m => m.email === email) || sub.adminEmail === email) { showToast('Este email já está na assinatura do time.', 'warning'); return; }
+  if ((sub.members.length + 1) >= rule.maxParticipants) { showToast('Limite de participantes do plano atingido.', 'warning'); return; }
+  sub.members.push({ name, email });
+  document.getElementById('memberName').value = '';
+  document.getElementById('memberEmail').value = '';
+  saveDB();
+  renderTeamMembers();
+  showToast('Participante adicionado à assinatura do time.', 'success');
+}
+
+function removeTeamMember(index) {
+  if (_publicReadonly) return;
+  const team = db.teams[currentTeamId];
+  if (!team || !canManageTeamMembers(team)) return;
+  const sub = ensureTeamSubscription(team.id);
+  if (!sub.members[index]) return;
+  sub.members.splice(index, 1);
+  saveDB();
+  renderTeamMembers();
+}
+
+function renderBillingModalities() {
+  const b = getBilling();
+  const planId = b.plan || 'starter';
+  const rule = getPlanRule(planId);
+  if (!Array.isArray(b.allowedModalities) || !b.allowedModalities.length) {
+    b.allowedModalities = [...rule.allowedModalities];
+    saveBilling(b);
+  }
+  const box = document.getElementById('billingModalities');
+  const help = document.getElementById('billingModalityHelp');
+  box.innerHTML = ALL_MODALITIES.map(mod => {
+    const active = b.allowedModalities.includes(mod);
+    return `<button class="btn btn-sm" style="border-color:${active?'var(--accent)':'var(--border)'};color:${active?'var(--accent)':'var(--muted)'}" onclick="toggleBillingModality('${mod}')">${mod}</button>`;
+  }).join('');
+  help.textContent = `Plano ${(planId || 'starter').toUpperCase()}: escolha até ${rule.maxModalities} modalidade(s).`;
+}
+
+function toggleBillingModality(modality) {
+  const b = getBilling();
+  const planId = b.plan || 'starter';
+  const rule = getPlanRule(planId);
+  const arr = Array.isArray(b.allowedModalities) && b.allowedModalities.length ? b.allowedModalities : [...rule.allowedModalities];
+  const has = arr.includes(modality);
+  if (has) {
+    if (arr.length === 1) { showToast('Mantenha pelo menos uma modalidade liberada.', 'warning'); return; }
+    b.allowedModalities = arr.filter(m => m !== modality);
+  } else {
+    if (arr.length >= rule.maxModalities) { showToast(`Este plano permite até ${rule.maxModalities} modalidade(s).`, 'warning'); return; }
+    b.allowedModalities = [...arr, modality];
+  }
+  saveBilling(b);
+  renderBillingModalities();
+}
+
 function openBillingModal() {
   const plans = [
-    { id:'starter', nome:'Starter', preco:'R$ 49/mês', desc:'1 técnico · até 5 times' },
-    { id:'pro', nome:'Pro', preco:'R$ 99/mês', desc:'Comissão técnica · times ilimitados' },
-    { id:'club', nome:'Club', preco:'R$ 299/mês', desc:'Multiusuário + relatórios públicos' }
+    { id:'starter', nome:'Starter', preco:'R$ 49/mês', desc:'1 técnico · até 5 times · 1 modalidade' },
+    { id:'pro', nome:'Pro', preco:'R$ 99/mês', desc:'Comissão técnica · 2 modalidades · até 6 pessoas/time' },
+    { id:'club', nome:'Club', preco:'R$ 299/mês', desc:'Clube · todas modalidades · até 25 pessoas/time' }
   ];
   const b = getBilling();
+  const rule = getPlanRule(b.plan || 'starter');
   const grid = document.getElementById('billingPlans');
   grid.innerHTML = plans.map(p => `
     <div style="border:1px solid ${b.plan===p.id?'var(--accent)':'var(--border)'};padding:10px;background:${b.plan===p.id?'rgba(200,241,53,.06)':'var(--surface2)'}">
@@ -2437,16 +2858,19 @@ function openBillingModal() {
       <div style="color:var(--muted);font-size:10px;letter-spacing:1px;line-height:1.6">${p.desc}</div>
       <button class="btn btn-sm" style="margin-top:8px" onclick="choosePlan('${p.id}')">Selecionar</button>
     </div>`).join('');
+  renderBillingModalities();
   document.getElementById('billingStatus').innerHTML = b.plan
-    ? `Plano atual: <b style="color:var(--accent)">${b.plan.toUpperCase()}</b><br>Status: <b style="color:${b.status==='ativo'?'var(--accent)':'#f0c040'}">${b.status || 'pendente'}</b><br>Último pagamento: ${b.lastPaid || '—'}`
+    ? `Plano atual: <b style="color:var(--accent)">${b.plan.toUpperCase()}</b><br>Status: <b style="color:${b.status==='ativo'?'var(--accent)':'#f0c040'}">${b.status || 'pendente'}</b><br>Modalidades liberadas: ${(b.allowedModalities || rule.allowedModalities).join(', ')}<br>Último pagamento: ${b.lastPaid || '—'}`
     : 'Nenhum plano selecionado.';
   openModal('modalBilling');
 }
 
 function choosePlan(planId) {
   const b = getBilling();
+  const rule = getPlanRule(planId);
   b.plan = planId;
   b.status = b.status || 'pendente';
+  b.allowedModalities = [...rule.allowedModalities];
   saveBilling(b);
   openBillingModal();
 }
@@ -2549,6 +2973,8 @@ function openGame(teamId, gameId) {
   const t = db.teams[teamId];
   const g = t.games[gameId];
 
+  refreshModalitySelect(g.modality || '');
+
   if (!g.modality) {
     document.getElementById('bc-mod-team').textContent = t.name;
     document.getElementById('bc-mod-game').textContent = g.name;
@@ -2560,12 +2986,37 @@ function openGame(teamId, gameId) {
     setHash(`#/team/${teamId}/game/${gameId}`);
     return;
   }
+  if (!isModalityAllowed(g.modality)) {
+    document.getElementById('modError').textContent = 'Seu plano atual não permite esta modalidade. Ajuste o plano ou escolha uma modalidade liberada.';
+    showView('modality');
+    return;
+  }
   _openScoutView();
+}
+
+function refreshModalitySelect(selectedValue) {
+  const sel = document.getElementById('modalitySelect');
+  if (!sel) return;
+  const allowed = getAllowedModalities();
+  const options = ALL_MODALITIES.filter(m => allowed.includes(m));
+  const previous = selectedValue || sel.value || '';
+  sel.innerHTML = '<option value="">— Selecione a modalidade —</option>';
+  options.forEach(m => {
+    const op = document.createElement('option');
+    op.value = m;
+    op.textContent = m;
+    sel.appendChild(op);
+  });
+  if (options.includes(previous)) sel.value = previous;
 }
 
 function confirmModality() {
   const sel = document.getElementById('modalitySelect').value;
   if (!sel) { document.getElementById('modError').textContent = 'Selecione uma modalidade para continuar.'; return; }
+  if (!isModalityAllowed(sel)) {
+    document.getElementById('modError').textContent = 'Modalidade não liberada no seu plano atual.';
+    return;
+  }
   db.teams[currentTeamId].games[currentGameId].modality = sel;
   saveDB();
   _openScoutView();
@@ -2579,6 +3030,7 @@ function changeModality() {
   document.getElementById('bc-mod-game').textContent = g.name;
   document.getElementById('modTeamName').textContent = t.name;
   document.getElementById('modGameTitle').textContent = g.name;
+  refreshModalitySelect(g.modality || '');
   document.getElementById('modalitySelect').value = g.modality || '';
   document.getElementById('modError').textContent = '';
   showView('modality');
