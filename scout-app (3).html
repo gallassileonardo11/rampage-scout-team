@@ -425,6 +425,12 @@
   .tdstat{display:flex;flex-direction:column;gap:1px;}
   .tdstat-value{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);line-height:1;}
   .tdstat-label{color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+  .roster-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--bg);padding:5px 8px;font-size:10px;letter-spacing:1px;color:var(--text);}
+  .roster-chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;}
+  .roster-chip button:hover{color:var(--danger);}
+  .public-banner{padding:8px 14px;background:#281000;border-bottom:1px solid var(--accent2);color:#ffb380;font-size:10px;letter-spacing:1px;display:none;}
+  .public-banner.visible{display:block;}
+  .plan-card{border:1px solid var(--border);padding:10px;background:var(--bg);}
 
   /* ── SORT ── */
   th.sortable{cursor:pointer;user-select:none;transition:color .12s;}
@@ -649,6 +655,8 @@
 <header id="appHeader" style="display:none">
   <div class="logo">P.A.N.D.A. <span>// Programa de Análise e Neutralização de Decisões Adversárias</span></div>
   <div class="header-right" id="headerRight">
+    <button class="btn btn-sm" id="btnInstallApp" onclick="promptInstallApp()" title="Instalar app" style="display:none">⬇ Instalar</button>
+    <button class="btn btn-sm" id="btnBilling" onclick="openBillingModal()" title="Planos e pagamento">💳 Planos</button>
     <button class="btn btn-sm" id="btnConfig" onclick="openConfigModal()" title="Configurar chave de API Groq" style="display:none">⚙ Config</button>
     <button class="btn btn-sm" id="btnSearch" onclick="openSearch()" title="Busca global (Ctrl+K)" style="display:none">🔍 Buscar</button>
     <button class="btn btn-sm" id="btnViewAI" onclick="viewLastAI()" style="display:none" title="Ver última análise IA">📄 Ver Análise</button>
@@ -701,6 +709,16 @@
     </div>
   </div>
   <div id="teamDashboard" class="team-dashboard" style="display:none"></div>
+  <div class="team-dashboard" id="rosterSection" style="display:none;border-top:1px solid var(--border)">
+    <div class="team-dashboard-title">👥 Elenco Próprio</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px" id="rosterForm">
+      <input class="admin-search-input" id="rosterNumber" placeholder="#" style="max-width:80px">
+      <input class="admin-search-input" id="rosterName" placeholder="Nome do atleta" style="min-width:180px">
+      <input class="admin-search-input" id="rosterPos" placeholder="Posição" style="max-width:140px">
+      <button class="btn btn-sm" onclick="addRosterPlayer()">+ Adicionar</button>
+    </div>
+    <div id="rosterList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
   <div class="games-sort-bar">
     <span class="games-sort-label">Ordenar:</span>
     <button class="games-sort-btn active" id="gSortDate" onclick="setGamesSort('date')">Por Data</button>
@@ -747,6 +765,7 @@
 
 <!-- VIEW: SCOUT -->
 <div class="view" id="view-scout">
+  <div class="public-banner" id="publicBanner">Modo público somente leitura ativo.</div>
   <div class="breadcrumb">
     <span class="bc-link" onclick="goHome()">Times</span>
     <span class="bc-sep">›</span>
@@ -890,6 +909,8 @@
           <tr id="tableHeaderRow">
             <th>#</th>
             <th>&#9733;</th>
+            <th># Atleta</th>
+            <th>Jogador</th>
             <th class="sortable" onclick="toggleSort('quarter')" id="th-quarter">Q</th>
             <th class="sortable" onclick="toggleSort('yardLine')" id="th-yardLine">Yard Line</th>
             <th class="sortable" onclick="toggleSort('down')" id="th-down">Down</th>
@@ -906,11 +927,13 @@
             <th class="sortable" onclick="toggleSort('result')" id="th-result">Resultado</th>
             <th class="sortable" onclick="toggleSort('yards')" id="th-yards">Metros</th>
             <th class="sortable" onclick="toggleSort('fieldZone')" id="th-fieldZone" style="display:none">Pos. Final</th>
-            <th>Obs.</th><th></th>
+            <th>Obs.</th><th></th><th>Tempo Vídeo</th><th>▶</th>
           </tr>
           <tr class="filter-row">
             <th></th>
             <th></th>
+            <th><input id="fPlayerNumber" type="text" placeholder="..." oninput="setFilter('playerNumber',this.value)"></th>
+            <th><input id="fPlayerName" type="text" placeholder="..." oninput="setFilter('playerName',this.value)"></th>
             <th><select id="fQuarter" onchange="setFilter('quarter',this.value)"><option value="">—</option></select></th>
             <th><input id="fYardLine" type="text" placeholder="..." oninput="setFilter('yardLine',this.value)"></th>
             <th><select id="fDown" onchange="setFilter('down',this.value)"><option value="">—</option></select></th>
@@ -929,6 +952,8 @@
             <th style="display:none"><select id="fZone" onchange="setFilter('fieldZone',this.value)"><option value="">—</option></select></th>
             <th><input id="fObs" type="text" placeholder="..." oninput="setFilter('obs',this.value)"></th>
             <th><button class="btn btn-sm" id="filterClearBtn" onclick="clearFilters()" title="Limpar filtros" style="padding:2px 6px;position:relative">✕<span class="filter-badge" id="filterBadge" style="display:none"></span></button></th>
+            <th><input id="fVideoTime" type="text" placeholder="mm:ss" oninput="setFilter('videoTime',this.value)"></th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -958,6 +983,36 @@
       <textarea class="notes-textarea" id="gameNotes"
         placeholder="Anotações livres, tendências observadas, impressões gerais sobre o jogo..."
         oninput="saveGame()"></textarea>
+    </div>
+  </div>
+
+  <div class="notes-section" id="planSection">
+    <div class="notes-header" onclick="toggleGamePlan()">
+      <span class="notes-label">🧠 Plano de Jogo</span>
+      <button class="notes-toggle-btn" id="planToggleBtn">▶ expandir</button>
+    </div>
+    <div id="planBody" style="display:none">
+      <textarea class="notes-textarea" id="gamePlan"
+        placeholder="Plano ofensivo, ajustes defensivos, alertas situacionais e calls-chave..."
+        oninput="saveGame()"></textarea>
+    </div>
+  </div>
+
+  <div class="notes-section" id="diagramSection">
+    <div class="notes-header" onclick="toggleDiagram()">
+      <span class="notes-label">✏ Diagrama de Jogadas</span>
+      <button class="notes-toggle-btn" id="diagramToggleBtn">▶ expandir</button>
+    </div>
+    <div id="diagramBody" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn btn-sm" onclick="setDiagramColor('#c8f135')">Verde</button>
+        <button class="btn btn-sm" onclick="setDiagramColor('#ff4d00')">Laranja</button>
+        <button class="btn btn-sm" onclick="setDiagramColor('#4d88ff')">Azul</button>
+        <button class="btn btn-sm" onclick="clearDiagram()">Limpar</button>
+        <button class="btn btn-sm" onclick="saveDiagramImage()">Salvar Diagrama</button>
+        <button class="btn btn-sm" onclick="downloadDiagramImage()">Baixar PNG</button>
+      </div>
+      <canvas id="playDiagramCanvas" width="1200" height="500" style="width:100%;max-width:100%;background:#0b1320;border:1px solid var(--border);cursor:crosshair"></canvas>
     </div>
   </div>
 
@@ -996,6 +1051,27 @@
       <button class="btn btn-sm" onclick="exportFullBackup()">&#x2193; Baixar Backup JSON</button>
       <button class="btn" onclick="closeModal('modalImport')">Fechar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: Planos e Pagamento -->
+<div class="modal-overlay" id="modalBilling">
+  <div class="modal" style="width:640px;max-width:96vw;max-height:86vh;overflow:auto">
+    <div class="modal-title">💳 Planos P.A.N.D.A.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px" id="billingPlans"></div>
+    <label>Status da assinatura</label>
+    <div id="billingStatus" style="border:1px solid var(--border);padding:10px;background:var(--bg);font-size:11px;letter-spacing:1px;color:var(--muted)"></div>
+    <label style="margin-top:12px">Pagamento via PIX</label>
+    <div style="border:1px solid var(--border);padding:10px;background:var(--bg)">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px">CHAVE PIX</div>
+      <div id="pixKey" style="font-size:12px;color:var(--text);word-break:break-all">financeiro@panda-scout.com</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-sm" onclick="copyPixKey()">Copiar Chave</button>
+        <button class="btn btn-sm btn-primary" onclick="confirmPixPayment()">Já paguei</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:8px">Obs.: aprovação automática simulada nesta versão local.</div>
+    </div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('modalBilling')">Fechar</button></div>
   </div>
 </div>
 
@@ -1171,6 +1247,10 @@ let db = { teams: {} };
 let currentTeamId = null;
 let currentGameId = null;
 let currentUser = null; // Firebase Auth user
+let _publicReadonly = false;
+let _installPrompt = null;
+let _diagramColor = '#c8f135';
+let _diagramDrawing = false;
 
 const DOWN = ['1º Down','2º Down','3º Down','4º Down','Extra Point'];
 const TYPE = ['Passe','Corrida','Penalidade','Turnover','Punt/Kick'];
@@ -1241,8 +1321,13 @@ async function initFirebaseClient() {
         await ensureUserProfile(user);
         await checkApproval(user);
       } else {
-        hidePendingScreen();
-        showLoginScreen();
+        if ((window.location.hash || '').startsWith('#/public/')) {
+          hidePendingScreen();
+          showAppPublicGuest();
+        } else {
+          hidePendingScreen();
+          showLoginScreen();
+        }
       }
     });
   } catch(e) {
@@ -1988,6 +2073,23 @@ function showAppForUser(user) {
   });
 }
 
+function showAppPublicGuest() {
+  hideLoginScreen();
+  hidePendingScreen();
+  const badge  = document.getElementById('userBadge');
+  if (badge) badge.style.display = 'none';
+  document.getElementById('btnConfig').style.display = 'none';
+  document.getElementById('btnSearch').style.display = 'none';
+  document.getElementById('btnImport').style.display = 'none';
+  document.getElementById('btnPrint').style.display = 'none';
+  document.getElementById('btnViewAI').style.display = 'none';
+  try {
+    const r = localStorage.getItem(_localDbKey());
+    if (r) db = JSON.parse(r);
+  } catch(e) {}
+  handleHashRoute();
+}
+
 // ── PERSISTENCE ──
 function _localDbKey() {
   const uid = _adminViewingUid || currentUser?.uid;
@@ -2098,16 +2200,24 @@ function setHash(hash) {
 
 function handleHashRoute() {
   const hash = window.location.hash || '#/';
+  const mp = hash.match(/^#\/public\/([^\/]+)$/);
   const m2 = hash.match(/^#\/team\/([^\/]+)\/game\/([^\/]+)$/);
   const m1 = hash.match(/^#\/team\/([^\/]+)$/);
+  if (mp) {
+    openPublicGameByToken(mp[1]);
+    return;
+  }
   if (m2) {
+    _publicReadonly = false;
     const teamId = m2[1], gameId = m2[2];
     if (db.teams[teamId]?.games[gameId]) { openGame(teamId, gameId); return; }
   }
   if (m1) {
+    _publicReadonly = false;
     const teamId = m1[1];
     if (db.teams[teamId]) { openTeam(teamId); return; }
   }
+  _publicReadonly = false;
   goHome();
 }
 
@@ -2120,19 +2230,33 @@ function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
   const inScout = name === 'scout';
-  document.getElementById('btnAnalyze').style.display = inScout ? '' : 'none';
-  document.getElementById('btnExport').style.display = inScout ? '' : 'none';
+  document.getElementById('btnAnalyze').style.display = (inScout && !_publicReadonly) ? '' : 'none';
+  document.getElementById('btnExport').style.display = (inScout && !_publicReadonly) ? '' : 'none';
   document.getElementById('btnPrint').style.display = inScout ? '' : 'none';
-  document.getElementById('btnImport').style.display = inScout ? '' : 'none';
+  document.getElementById('btnImport').style.display = (inScout && !_publicReadonly) ? '' : 'none';
   // Mostrar btnViewAI só se há histórico
   if (inScout) {
     const g = db.teams[currentTeamId]?.games[currentGameId];
-    document.getElementById('btnViewAI').style.display = g?.aiHistory?.length ? '' : 'none';
+    document.getElementById('btnViewAI').style.display = (!_publicReadonly && g?.aiHistory?.length) ? '' : 'none';
   } else {
     document.getElementById('btnViewAI').style.display = 'none';
   }
+  const pb = document.getElementById('publicBanner');
+  if (pb) pb.classList.toggle('visible', inScout && _publicReadonly);
 }
-function goHome() { sharedContext = null; setHash('#/'); showView('home'); renderHome(); renderSharedSection(); }
+
+function setScoutReadOnlyState() {
+  const inps = document.querySelectorAll('#view-scout input, #view-scout select, #view-scout textarea');
+  inps.forEach(el => { el.disabled = !!_publicReadonly; });
+  const editableBtns = [
+    ...document.querySelectorAll('#view-scout .add-row-btn'),
+    ...document.querySelectorAll('#view-scout .del-btn'),
+    ...document.querySelectorAll('#view-scout .dup-btn'),
+    ...document.querySelectorAll('#view-scout .flag-btn')
+  ];
+  editableBtns.forEach(b => { b.style.display = _publicReadonly ? 'none' : ''; });
+}
+function goHome() { sharedContext = null; _publicReadonly = false; setHash('#/'); showView('home'); renderHome(); renderSharedSection(); }
 function goTeam() { if(currentTeamId) { openTeam(currentTeamId); } }
 
 // ── MODALS ──
@@ -2175,7 +2299,7 @@ function createTeam() {
   const name = document.getElementById('newTeamName').value.trim();
   if (!name) { showToast('Informe o nome do time.', 'error'); return; }
   const id = 'team_' + Date.now();
-  db.teams[id] = { id, name, league: document.getElementById('newTeamLeague').value.trim(), games: {} };
+  db.teams[id] = { id, name, league: document.getElementById('newTeamLeague').value.trim(), games: {}, roster: [] };
   saveDB();
   closeModal('modalTeam');
   showToast(`Time “${name}” criado.`, 'success');
@@ -2203,6 +2327,7 @@ function openTeam(teamId) {
   document.getElementById('btnShareTeam').style.display = _firebaseDb && currentUser ? '' : 'none';
   document.getElementById('btnNewGame').style.display = '';
   document.getElementById('btnDeleteTeam').style.display = '';
+  renderRoster();
   renderTeamDashboard();
   renderGames();
   showView('team');
@@ -2225,6 +2350,7 @@ function renderGames() {
     const scoreStr = hasScore ? `<span style="color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px">${g.scoreUs} \u00d7 ${g.scoreThem}</span>` : '';
     return `<div class="game-card" onclick="openGame('${currentTeamId}','${g.id}')">
       <button class="game-card-del" onclick="event.stopPropagation();deleteGame('${currentTeamId}','${g.id}')">×</button>
+      <button class="game-card-del" style="right:34px;color:var(--accent2)" title="Copiar link público" onclick="event.stopPropagation();copyPublicGameLink('${currentTeamId}','${g.id}')">🔗</button>
       <div class="game-card-name">${g.name}</div>
       <div class="game-card-meta">${g.phase||''} ${g.date?'\u00b7 '+g.date:''}</div>
       <div class="game-card-stats">
@@ -2237,6 +2363,142 @@ function renderGames() {
   }).join('') + '</div>';
 }
 
+function renderRoster() {
+  const section = document.getElementById('rosterSection');
+  const list = document.getElementById('rosterList');
+  const team = db.teams[currentTeamId];
+  if (!section || !list || !team) return;
+  team.roster = team.roster || [];
+  section.style.display = '';
+  const canEdit = !_publicReadonly && !(sharedContext && sharedContext.role === 'viewer');
+  const form = document.getElementById('rosterForm');
+  if (form) form.style.display = canEdit ? 'flex' : 'none';
+  if (!team.roster.length) {
+    list.innerHTML = '<span style="color:var(--muted);font-size:10px;letter-spacing:1px">Nenhum atleta cadastrado.</span>';
+    return;
+  }
+  list.innerHTML = team.roster.map((r, i) => {
+    const rm = canEdit ? `<button title="Remover" onclick="removeRosterPlayer(${i})">×</button>` : '';
+    return `<span class="roster-chip"><b style="color:var(--accent)">#${r.number || '--'}</b> ${r.name || 'Sem nome'} <span style="color:var(--muted)">${r.pos || ''}</span>${rm}</span>`;
+  }).join('');
+}
+
+function addRosterPlayer() {
+  if (_publicReadonly) return;
+  const team = db.teams[currentTeamId];
+  if (!team) return;
+  team.roster = team.roster || [];
+  const number = (document.getElementById('rosterNumber').value || '').trim();
+  const name = (document.getElementById('rosterName').value || '').trim();
+  const pos = (document.getElementById('rosterPos').value || '').trim();
+  if (!name) { showToast('Informe o nome do atleta.', 'warning'); return; }
+  team.roster.push({ number, name, pos });
+  document.getElementById('rosterNumber').value = '';
+  document.getElementById('rosterName').value = '';
+  document.getElementById('rosterPos').value = '';
+  saveDB();
+  renderRoster();
+}
+
+function removeRosterPlayer(index) {
+  if (_publicReadonly) return;
+  const team = db.teams[currentTeamId];
+  if (!team?.roster?.length) return;
+  team.roster.splice(index, 1);
+  saveDB();
+  renderRoster();
+}
+
+function _billingKey() {
+  const uid = _adminViewingUid || currentUser?.uid || 'local';
+  return 'panda_billing_' + uid;
+}
+
+function getBilling() {
+  try { return JSON.parse(localStorage.getItem(_billingKey()) || '{}'); } catch(e) { return {}; }
+}
+
+function saveBilling(data) {
+  localStorage.setItem(_billingKey(), JSON.stringify(data || {}));
+}
+
+function openBillingModal() {
+  const plans = [
+    { id:'starter', nome:'Starter', preco:'R$ 49/mês', desc:'1 técnico · até 5 times' },
+    { id:'pro', nome:'Pro', preco:'R$ 99/mês', desc:'Comissão técnica · times ilimitados' },
+    { id:'club', nome:'Club', preco:'R$ 299/mês', desc:'Multiusuário + relatórios públicos' }
+  ];
+  const b = getBilling();
+  const grid = document.getElementById('billingPlans');
+  grid.innerHTML = plans.map(p => `
+    <div style="border:1px solid ${b.plan===p.id?'var(--accent)':'var(--border)'};padding:10px;background:${b.plan===p.id?'rgba(200,241,53,.06)':'var(--surface2)'}">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent)">${p.nome}</div>
+      <div style="color:var(--text);font-size:12px;margin:2px 0 4px">${p.preco}</div>
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;line-height:1.6">${p.desc}</div>
+      <button class="btn btn-sm" style="margin-top:8px" onclick="choosePlan('${p.id}')">Selecionar</button>
+    </div>`).join('');
+  document.getElementById('billingStatus').innerHTML = b.plan
+    ? `Plano atual: <b style="color:var(--accent)">${b.plan.toUpperCase()}</b><br>Status: <b style="color:${b.status==='ativo'?'var(--accent)':'#f0c040'}">${b.status || 'pendente'}</b><br>Último pagamento: ${b.lastPaid || '—'}`
+    : 'Nenhum plano selecionado.';
+  openModal('modalBilling');
+}
+
+function choosePlan(planId) {
+  const b = getBilling();
+  b.plan = planId;
+  b.status = b.status || 'pendente';
+  saveBilling(b);
+  openBillingModal();
+}
+
+function copyPixKey() {
+  const key = document.getElementById('pixKey').textContent.trim();
+  navigator.clipboard.writeText(key).then(() => showToast('Chave PIX copiada.', 'success'));
+}
+
+function confirmPixPayment() {
+  const b = getBilling();
+  if (!b.plan) { showToast('Selecione um plano antes de confirmar.', 'warning'); return; }
+  b.status = 'ativo';
+  b.lastPaid = new Date().toLocaleString('pt-BR');
+  saveBilling(b);
+  openBillingModal();
+  showToast('Pagamento confirmado. Plano ativado.', 'success');
+}
+
+function promptInstallApp() {
+  if (_installPrompt) {
+    _installPrompt.prompt();
+    _installPrompt.userChoice.finally(() => { _installPrompt = null; document.getElementById('btnInstallApp').style.display = 'none'; });
+    return;
+  }
+  showToast('Instalação não suportada neste navegador/contexto.', 'warning');
+}
+
+function copyPublicGameLink(teamId, gameId) {
+  const g = db.teams[teamId]?.games[gameId];
+  if (!g) return;
+  if (!g.publicToken) g.publicToken = 'pub_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  saveDB();
+  const url = window.location.href.split('#')[0] + '#/public/' + g.publicToken;
+  navigator.clipboard.writeText(url).then(() => showToast('Link público copiado.', 'success'));
+}
+
+function openPublicGameByToken(token) {
+  _publicReadonly = true;
+  for (const [teamId, t] of Object.entries(db.teams || {})) {
+    for (const [gameId, g] of Object.entries(t.games || {})) {
+      if (g.publicToken === token) {
+        openGame(teamId, gameId);
+        showToast('Visualização pública ativada (somente leitura).', 'info');
+        return;
+      }
+    }
+  }
+  showToast('Link público inválido ou expirado.', 'error');
+  goHome();
+}
+
 function openNewGameModal() {
   document.getElementById('newGameName').value = '';
   document.getElementById('newGameDate').value = '';
@@ -2246,6 +2508,7 @@ function openNewGameModal() {
 }
 
 function createGame() {
+  if (_publicReadonly) return;
   const name = document.getElementById('newGameName').value.trim();
   if (!name) { showToast('Informe a identificação do jogo.', 'error'); return; }
   const id = 'game_' + Date.now();
@@ -2253,7 +2516,7 @@ function createGame() {
     id, name,
     date: document.getElementById('newGameDate').value,
     phase: document.getElementById('newGamePhase').value,
-    link: '', plays: []
+    link: '', plays: [], gamePlan: '', diagramImage: '', publicToken: ''
   };
   saveDB();
   closeModal('modalGame');
@@ -2262,6 +2525,7 @@ function createGame() {
 }
 
 function deleteCurrentTeam() {
+  if (_publicReadonly) return;
   showConfirm('Excluir este time e todos os seus jogos?', () => {
     delete db.teams[currentTeamId]; currentTeamId=null; saveDB(); goHome();
     showToast('Time excluído.', 'warning');
@@ -2269,6 +2533,7 @@ function deleteCurrentTeam() {
 }
 
 function deleteGame(teamId, gameId) {
+  if (_publicReadonly) return;
   showConfirm('Excluir este jogo?', () => {
     delete db.teams[teamId].games[gameId]; saveDB(); renderGames();
     showToast('Jogo excluído.', 'warning');
@@ -2330,6 +2595,8 @@ function _openScoutView() {
   document.getElementById('scoreUs').value = g.scoreUs || '';
   document.getElementById('scoreThem').value = g.scoreThem || '';
   document.getElementById('gameNotes').value = g.notes || '';
+  const gp = document.getElementById('gamePlan');
+  if (gp) gp.value = g.gamePlan || '';
   const badge = document.getElementById('gameModalityBadge');
   const modText = document.getElementById('gameModalityText');
   if (g.modality) { badge.style.display = ''; modText.textContent = g.modality; }
@@ -2340,6 +2607,11 @@ function _openScoutView() {
   _notesExpanded = !!(g.notes && g.notes.trim());
   document.getElementById('notesBody').style.display = _notesExpanded ? '' : 'none';
   document.getElementById('notesToggleBtn').textContent = _notesExpanded ? '▼ recolher' : '▶ expandir';
+  _planExpanded = !!(g.gamePlan && g.gamePlan.trim());
+  const planBody = document.getElementById('planBody');
+  const planBtn = document.getElementById('planToggleBtn');
+  if (planBody) planBody.style.display = _planExpanded ? '' : 'none';
+  if (planBtn) planBtn.textContent = _planExpanded ? '▼ recolher' : '▶ expandir';
   // Video: reset ao abrir novo jogo
   clearLocalVideo();
   _videoExpanded = false;
@@ -2354,6 +2626,8 @@ function _openScoutView() {
   document.getElementById('videoYtUrl').value = '';
   document.getElementById('videoYtEmbed').innerHTML = '<div class="video-no-link">Insira um link do YouTube acima ou clique em "Usar link do tape"</div>';
   switchVideoTab('youtube');
+  if (typeof initDiagram === 'function') initDiagram();
+  if (g.diagramImage && typeof loadDiagramImage === 'function') loadDiagramImage(g.diagramImage);
   // Remove old AI history panel so it re-renders fresh
   document.getElementById('aiHistorySection')?.remove();
   _currentPage = 1;
@@ -2363,12 +2637,14 @@ function _openScoutView() {
   initFilterOptions();
   renderTable();
   renderCharts();
+  setScoutReadOnlyState();
   if (g.aiHistory?.length) renderAIHistory();
   showView('scout');
   setHash(`#/team/${currentTeamId}/game/${currentGameId}`);
 }
 
 function saveGame() {
+  if (_publicReadonly) return;
   if (!currentTeamId || !currentGameId) return;
   const g = db.teams[currentTeamId].games[currentGameId];
   g.phase = document.getElementById('gamePhase').value;
@@ -2377,10 +2653,13 @@ function saveGame() {
   g.scoreUs   = document.getElementById('scoreUs').value;
   g.scoreThem = document.getElementById('scoreThem').value;
   g.notes = document.getElementById('gameNotes').value;
+  const gp = document.getElementById('gamePlan');
+  g.gamePlan = gp ? gp.value : (g.gamePlan || '');
   saveDB();
 }
 
 function deleteCurrentGame() {
+  if (_publicReadonly) return;
   showConfirm('Excluir este jogo e todas as jogadas?', () => {
     delete db.teams[currentTeamId].games[currentGameId]; currentGameId=null; saveDB(); openTeam(currentTeamId);
     showToast('Jogo excluído.', 'warning');
@@ -2393,6 +2672,7 @@ function deleteCurrentGame() {
 function newPlay(data = {}) {
   return {
     id: Date.now() + Math.random(),
+    playerNumber: data.playerNumber || '', playerName: data.playerName || '',
     quarter: data.quarter||'', yardLine: data.yardLine||'',
     down: data.down||'', distance: data.distance||'',
     personnel: data.personnel||'', type: data.type||'', runType: data.runType||'',
@@ -2400,12 +2680,13 @@ function newPlay(data = {}) {
     defFormation: data.defFormation||'', coverage: data.coverage||'',
     pressure: data.pressure||'', route: data.route||'',
     result: data.result||'', yards: data.yards||'',
-    fieldZone: data.fieldZone||'', obs: data.obs||'',
+    fieldZone: data.fieldZone||'', obs: data.obs||'', videoTime: data.videoTime || '',
     flagged: data.flagged||false
   };
 }
 
 function addRow() {
+  if (_publicReadonly) return;
   db.teams[currentTeamId].games[currentGameId].plays.push(newPlay());
   saveDB();
   renderTable();
@@ -2416,6 +2697,7 @@ function addRow() {
 }
 
 function deleteRow(id) {
+  if (_publicReadonly) return;
   const p = db.teams[currentTeamId].games[currentGameId].plays;
   const i = p.findIndex(x => x.id === id);
   if (i === -1) return;
@@ -2473,6 +2755,7 @@ function autoFillNextDistance(idx, playsArr) {
 }
 
 function updatePlay(id, field, value) {
+  if (_publicReadonly) return;
   const playsArr = db.teams[currentTeamId].games[currentGameId].plays;
   const idx = playsArr.findIndex(x => x.id === id);
   if (idx === -1) return;
@@ -2509,7 +2792,7 @@ function renderTable() {
   const allPlays = db.teams[currentTeamId]?.games[currentGameId]?.plays || [];
   if (!allPlays.length) {
     const tr = document.createElement('tr'); tr.className='empty-row';
-    tr.innerHTML='<td colspan="20">Nenhuma jogada registrada — clique em "+ Nova Jogada"</td>';
+    tr.innerHTML='<td colspan="24">Nenhuma jogada registrada — clique em "+ Nova Jogada"</td>';
     tbody.appendChild(tr); updateStats(); renderCharts();
     document.getElementById('paginationBar').style.display='none'; return;
   }
@@ -2517,7 +2800,7 @@ function renderTable() {
   const sorted = getSortedPlays(filtered);
   if (!sorted.length) {
     const tr = document.createElement('tr'); tr.className='empty-row';
-    tr.innerHTML='<td colspan="20">Nenhuma jogada corresponde aos filtros ativos.</td>';
+    tr.innerHTML='<td colspan="24">Nenhuma jogada corresponde aos filtros ativos.</td>';
     tbody.appendChild(tr); updateStats(); renderCharts();
     document.getElementById('paginationBar').style.display='none'; return;
   }
@@ -2564,9 +2847,19 @@ function renderTable() {
     const delBtn = document.createElement('button'); delBtn.className='del-btn'; delBtn.textContent='×'; delBtn.title='Excluir'; delBtn.onclick=()=>deleteRow(play.id);
     actTd.appendChild(dupBtn); actTd.appendChild(delBtn);
 
+    const jumpTd = document.createElement('td');
+    const jumpBtn = document.createElement('button');
+    jumpBtn.className = 'btn btn-sm';
+    jumpBtn.textContent = '▶';
+    jumpBtn.title = 'Ir para o tempo no vídeo';
+    jumpBtn.onclick = () => jumpToVideoTime(play.videoTime || '');
+    jumpTd.appendChild(jumpBtn);
+
     const cells = [
       numTd,
       flagTd,
+      mkTd(mkInp(play.playerNumber, play.id, 'playerNumber','#')),
+      mkTd(mkInp(play.playerName, play.id, 'playerName','nome')),
       mkTd(mkSel(QUARTER, play.quarter, play.id,'quarter')),
       mkTd(mkInp(play.yardLine, play.id, 'yardLine','1-99')),
       mkTd(mkSel(DOWN,   play.down,        play.id,'down')),
@@ -2584,7 +2877,9 @@ function renderTable() {
       mkTd(mkInp(play.yards, play.id,      'yards','0')),
       ...(is9x9 ? [mkTd(mkSel(FIELD_ZONE, play.fieldZone, play.id,'fieldZone'))] : []),
       mkTd(mkInp(play.obs, play.id,        'obs','observação...')),
-      actTd
+      actTd,
+      mkTd(mkInp(play.videoTime, play.id,  'videoTime','mm:ss')),
+      jumpTd
     ];
     cells.forEach(td => tr.appendChild(td));
     tbody.appendChild(tr);
@@ -2605,6 +2900,7 @@ function renderTable() {
     }
   }
   renderPaginationBar(sorted.length, totalPages);
+  setScoutReadOnlyState();
 }
 
 function updateFilterBadge() {
@@ -2628,6 +2924,7 @@ function renderPaginationBar(total, totalPages) {
 function goToPage(n) { _currentPage = n; renderTable(); }
 
 function toggleFlag(id) {
+  if (_publicReadonly) return;
   const p = db.teams[currentTeamId].games[currentGameId].plays;
   const play = p.find(x=>x.id===id); if(!play) return;
   play.flagged = !play.flagged;
@@ -2685,8 +2982,8 @@ function exportCSV() {
   const p = db.teams[currentTeamId]?.games[currentGameId]?.plays || [];
   if (!p.length) { showToast('Nenhuma jogada para exportar.', 'warning'); return; }
   const t = db.teams[currentTeamId]; const g = t.games[currentGameId];
-  const headers = ['#','Q','Yard Line','Down','Distância','Personnel','Tipo','T. Corrida','Formação Off.','Hash','Formação Def.','Coverage','Pressão','Conceito/Rota','Resultado','Metros','Pos. Final','Obs','Destaque'];
-  const rows = p.map((x,i) => [i+1,x.quarter||'',x.yardLine||'',x.down,x.distance,x.personnel||'',x.type,x.runType||'',x.formation,x.hash||'',x.defFormation,x.coverage,x.pressure||'',x.route,x.result,x.yards,x.fieldZone,x.obs,x.flagged?'sim':'']);
+  const headers = ['#','# Atleta','Jogador','Q','Yard Line','Down','Distância','Personnel','Tipo','T. Corrida','Formação Off.','Hash','Formação Def.','Coverage','Pressão','Conceito/Rota','Resultado','Metros','Pos. Final','Obs','Tempo Vídeo','Destaque'];
+  const rows = p.map((x,i) => [i+1,x.playerNumber||'',x.playerName||'',x.quarter||'',x.yardLine||'',x.down,x.distance,x.personnel||'',x.type,x.runType||'',x.formation,x.hash||'',x.defFormation,x.coverage,x.pressure||'',x.route,x.result,x.yards,x.fieldZone,x.obs,x.videoTime||'',x.flagged?'sim':'']);
   const csv = [headers,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -2705,7 +3002,38 @@ function showSaveIndicator(state) {
 
 // ── PRINT ──
 function printScout() {
-  window.print();
+  const t = db.teams[currentTeamId];
+  const g = t?.games?.[currentGameId];
+  if (!t || !g) { window.print(); return; }
+  const p = g.plays || [];
+  const pass = p.filter(x=>x.type==='Passe').length;
+  const run = p.filter(x=>x.type==='Corrida').length;
+  const conv = p.filter(x=>x.result==='Conversão'||x.result==='Touchdown').length;
+  const turn = p.filter(x=>x.result==='Interceptação'||x.result==='Fumble'||x.type==='Turnover').length;
+  const rows = p.map((x,i)=>`<tr><td>${i+1}</td><td>${x.playerNumber||''}</td><td>${x.playerName||''}</td><td>${x.down||''}</td><td>${x.type||''}</td><td>${x.formation||''}</td><td>${x.defFormation||''}</td><td>${x.result||''}</td><td>${x.yards||''}</td><td>${x.videoTime||''}</td></tr>`).join('');
+  const win = window.open('', '_blank');
+  if (!win) { window.print(); return; }
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Relatório P.A.N.D.A.</title><style>
+    body{font-family:Arial,sans-serif;color:#111;margin:24px}
+    .h{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:8px}
+    .b{font-size:26px;font-weight:800;letter-spacing:1px}.s{font-size:11px;color:#555}
+    .meta{margin-top:10px;font-size:12px;color:#333}
+    .k{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0}
+    .k>div{border:1px solid #ddd;padding:8px;text-align:center}
+    .kv{font-size:22px;font-weight:700}.kl{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:1px}
+    table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ddd;padding:6px}th{background:#f6f6f6}
+    .blk{margin-top:14px}.ttl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#444;margin-bottom:6px}
+    .card{border:1px solid #ddd;padding:8px;white-space:pre-wrap;line-height:1.5}
+  </style></head><body>
+  <div class="h"><div><div class="b">P.A.N.D.A. Scout Report</div><div class="s">Programa de Análise e Neutralização de Decisões Adversárias</div></div><div class="s">${new Date().toLocaleDateString('pt-BR')}</div></div>
+  <div class="meta"><b>Time:</b> ${t.name} &nbsp; <b>Jogo:</b> ${g.name} &nbsp; <b>Fase:</b> ${g.phase||'—'} &nbsp; <b>Data:</b> ${g.date||'—'}</div>
+  <div class="k"><div><div class="kv">${p.length}</div><div class="kl">Jogadas</div></div><div><div class="kv">${pass}</div><div class="kl">Passes</div></div><div><div class="kv">${run}</div><div class="kl">Corridas</div></div><div><div class="kv">${conv}</div><div class="kl">Conversões</div></div><div><div class="kv">${turn}</div><div class="kl">Turnovers</div></div></div>
+  <table><thead><tr><th>#</th><th>Atleta</th><th>Jogador</th><th>Down</th><th>Tipo</th><th>Form. Off</th><th>Form. Def</th><th>Resultado</th><th>Yds</th><th>Tempo</th></tr></thead><tbody>${rows||'<tr><td colspan="10">Sem jogadas.</td></tr>'}</tbody></table>
+  <div class="blk"><div class="ttl">Plano de jogo</div><div class="card">${(g.gamePlan||'Sem plano preenchido.').replace(/</g,'&lt;')}</div></div>
+  <div class="blk"><div class="ttl">Notas</div><div class="card">${(g.notes||'Sem notas.').replace(/</g,'&lt;')}</div></div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(() => { win.focus(); win.print(); }, 250);
 }
 
 // ── VIEW LAST AI ──
@@ -2857,13 +3185,26 @@ async function handleImportFile(file) {
       lines.forEach(line => {
         const cols = line.split(',').map(c => c.replace(/^"|"$/g,'').trim());
         if (cols.length < 4) return;
-        // tenta mapear: #,Q,YardLine,Down,Dist,Personnel,Tipo,TipoCorr,FormOff,Hash,FormDef,Cov,Press,Rota,Result,Yards,Zone,Obs
-        const play = newPlay({
-          quarter: cols[1]||'', yardLine: cols[2]||'', down: cols[3]||'', distance: cols[4]||'',
-          personnel: cols[5]||'', type: cols[6]||'', runType: cols[7]||'', formation: cols[8]||'',
-          hash: cols[9]||'', defFormation: cols[10]||'', coverage: cols[11]||'', pressure: cols[12]||'',
-          route: cols[13]||'', result: cols[14]||'', yards: cols[15]||'', fieldZone: cols[16]||'', obs: cols[17]||''
-        });
+        let play;
+        if (cols.length >= 21) {
+          // formato novo
+          play = newPlay({
+            playerNumber: cols[1]||'', playerName: cols[2]||'',
+            quarter: cols[3]||'', yardLine: cols[4]||'', down: cols[5]||'', distance: cols[6]||'',
+            personnel: cols[7]||'', type: cols[8]||'', runType: cols[9]||'', formation: cols[10]||'',
+            hash: cols[11]||'', defFormation: cols[12]||'', coverage: cols[13]||'', pressure: cols[14]||'',
+            route: cols[15]||'', result: cols[16]||'', yards: cols[17]||'', fieldZone: cols[18]||'', obs: cols[19]||'',
+            videoTime: cols[20]||''
+          });
+        } else {
+          // formato antigo
+          play = newPlay({
+            quarter: cols[1]||'', yardLine: cols[2]||'', down: cols[3]||'', distance: cols[4]||'',
+            personnel: cols[5]||'', type: cols[6]||'', runType: cols[7]||'', formation: cols[8]||'',
+            hash: cols[9]||'', defFormation: cols[10]||'', coverage: cols[11]||'', pressure: cols[12]||'',
+            route: cols[13]||'', result: cols[14]||'', yards: cols[15]||'', fieldZone: cols[16]||'', obs: cols[17]||''
+          });
+        }
         db.teams[currentTeamId].games[currentGameId].plays.push(play);
         count++;
       });
@@ -3502,7 +3843,7 @@ function clearFilters() {
   const btn = document.getElementById('btnFlagFilter');
   if (btn) { btn.style.borderColor='var(--muted)'; btn.style.color='var(--muted)'; btn.style.background=''; }
   ['fQuarter','fDown','fType','fRunType','fHash','fDefForm','fCov','fResult','fZone','fPersonnel','fPressure'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-  ['fDist','fForm','fRoute','fYards','fObs','fYardLine'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['fDist','fForm','fRoute','fYards','fObs','fYardLine','fPlayerNumber','fPlayerName','fVideoTime'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   renderTable();
 }
 
@@ -3653,6 +3994,19 @@ function renderTeamDashboard() {
   const in3d=allPlays.filter(x=>x.down==='3\u00ba Down');
   const conv3dPct=in3d.length?Math.round(in3d.filter(x=>x.result==='Convers\u00e3o'||x.result==='Touchdown').length/in3d.length*100):0;
   const topCov=COVERAGE.map(c=>({c,n:allPlays.filter(x=>x.coverage===c).length})).sort((a,b)=>b.n-a.n)[0];
+  const playerMap = {};
+  allPlays.forEach(x => {
+    const k = `${x.playerNumber || '--'} ${x.playerName || ''}`.trim();
+    if (!x.playerName && !x.playerNumber) return;
+    playerMap[k] = (playerMap[k] || 0) + 1;
+  });
+  const topPlayers = Object.entries(playerMap).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const recent = games.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-3);
+  const recentAvg = recent.map(g => {
+    const yp = (g.plays||[]).filter(x => x.yards !== '' && !isNaN(parseFloat(x.yards))).map(x => parseFloat(x.yards));
+    const avg = yp.length ? (yp.reduce((s,n)=>s+n,0)/yp.length).toFixed(1) : '0.0';
+    return `${g.name}: ${avg} yds`;
+  }).join(' \u00b7 ');
   el.innerHTML=`<div class="team-dashboard-title">\ud83d\udcca Estat\u00edsticas Agregadas \u2014 ${games.length} jogo${games.length!==1?'s':''} \u00b7 ${total} jogadas</div>
   <div class="team-dashboard-stats">
     <div class="tdstat"><div class="tdstat-value" style="color:#ff4d00">${total?Math.round(passes/total*100):0}%</div><div class="tdstat-label">% Passe</div></div>
@@ -3660,6 +4014,10 @@ function renderTeamDashboard() {
     <div class="tdstat"><div class="tdstat-value" style="color:var(--accent)">${total?Math.round(convs/total*100):0}%</div><div class="tdstat-label">% Convers\u00e3o</div></div>
     <div class="tdstat"><div class="tdstat-value">${conv3dPct}%</div><div class="tdstat-label">Conv. 3\u00ba Down</div></div>
     ${topCov&&topCov.n?`<div class="tdstat"><div class="tdstat-value" style="font-size:14px;padding-top:4px">${topCov.c}</div><div class="tdstat-label">Cobertura +freq.</div></div>`:''}
+  </div>
+  <div style="margin-top:10px;color:var(--muted);font-size:10px;letter-spacing:1px;line-height:1.8">
+    <b style="color:var(--text)">Tend\u00eancia recente:</b> ${recentAvg || 'Sem dados'}<br>
+    <b style="color:var(--text)">Jogadores mais acionados:</b> ${topPlayers.length ? topPlayers.map(([n,c])=>`${n} (${c})`).join(' \u00b7 ') : 'Sem identifica\u00e7\u00e3o de atletas'}
   </div>`;
 }
 
@@ -3781,7 +4139,7 @@ function _getYoutubeId(url) {
   return null;
 }
 
-function loadYoutubeEmbed() {
+function loadYoutubeEmbed(startSec) {
   const url = document.getElementById('videoYtUrl').value.trim();
   const container = document.getElementById('videoYtEmbed');
   if (!url) {
@@ -3790,7 +4148,8 @@ function loadYoutubeEmbed() {
   }
   const id = _getYoutubeId(url);
   if (id) {
-    container.innerHTML = `<div class="video-embed-wrap"><iframe src="https://www.youtube.com/embed/${encodeURIComponent(id)}" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`;
+    const s = Number.isFinite(startSec) && startSec > 0 ? `?start=${Math.floor(startSec)}` : '';
+    container.innerHTML = `<div class="video-embed-wrap"><iframe src="https://www.youtube.com/embed/${encodeURIComponent(id)}${s}" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`;
   } else {
     container.innerHTML = '<div class="video-no-link" style="color:var(--danger)">Link inválido — use um link do YouTube (youtube.com ou youtu.be).</div>';
   }
@@ -3803,6 +4162,31 @@ function loadYoutubeFromGameLink() {
   if (!id) return;
   document.getElementById('videoYtUrl').value = link;
   loadYoutubeEmbed();
+}
+
+function _parseVideoTimeToSec(v) {
+  const s = String(v || '').trim();
+  if (!s) return null;
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  const parts = s.split(':').map(x => parseInt(x, 10));
+  if (parts.some(n => Number.isNaN(n))) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function jumpToVideoTime(videoTime) {
+  const sec = _parseVideoTimeToSec(videoTime);
+  if (sec === null) { showToast('Tempo inválido. Use mm:ss ou segundos.', 'warning'); return; }
+  const localPlayer = document.getElementById('videoPlayer');
+  if (localPlayer && localPlayer.src) {
+    localPlayer.currentTime = sec;
+    localPlayer.play().catch(() => {});
+    switchVideoTab('upload');
+    return;
+  }
+  switchVideoTab('youtube');
+  loadYoutubeEmbed(sec);
 }
 
 function loadLocalVideo(event) {
@@ -3839,6 +4223,96 @@ function clearLocalVideo() {
   document.getElementById('videoUploadArea').style.display = 'block';
 }
 
+// ── GAME PLAN ──
+let _planExpanded = false;
+function toggleGamePlan() {
+  _planExpanded = !_planExpanded;
+  document.getElementById('planBody').style.display = _planExpanded ? '' : 'none';
+  document.getElementById('planToggleBtn').textContent = _planExpanded ? '\u25bc recolher' : '\u25b6 expandir';
+}
+
+// ── PLAY DIAGRAM ──
+let _diagramExpanded = false;
+function toggleDiagram() {
+  _diagramExpanded = !_diagramExpanded;
+  document.getElementById('diagramBody').style.display = _diagramExpanded ? '' : 'none';
+  document.getElementById('diagramToggleBtn').textContent = _diagramExpanded ? '\u25bc recolher' : '\u25b6 expandir';
+  if (_diagramExpanded) initDiagram();
+}
+
+function setDiagramColor(c) { _diagramColor = c; }
+
+function initDiagram() {
+  const canvas = document.getElementById('playDiagramCanvas');
+  if (!canvas || canvas.dataset.ready === '1') return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0b1320';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#1e2f4a';
+  for (let x = 0; x <= canvas.width; x += 100) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += 100) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+  const getPos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    _diagramDrawing = true;
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.strokeStyle = _diagramColor;
+    ctx.lineWidth = 4;
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!_diagramDrawing) return;
+    const p = getPos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  });
+  ['pointerup', 'pointerleave'].forEach(ev => canvas.addEventListener(ev, () => { _diagramDrawing = false; }));
+  canvas.dataset.ready = '1';
+}
+
+function clearDiagram() {
+  const canvas = document.getElementById('playDiagramCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0b1320';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function saveDiagramImage() {
+  if (_publicReadonly) return;
+  const g = db.teams[currentTeamId]?.games[currentGameId];
+  const canvas = document.getElementById('playDiagramCanvas');
+  if (!g || !canvas) return;
+  g.diagramImage = canvas.toDataURL('image/png');
+  saveDB();
+  showToast('Diagrama salvo no jogo.', 'success');
+}
+
+function loadDiagramImage(dataUrl) {
+  const canvas = document.getElementById('playDiagramCanvas');
+  if (!canvas || !dataUrl) return;
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+  img.src = dataUrl;
+}
+
+function downloadDiagramImage() {
+  const canvas = document.getElementById('playDiagramCanvas');
+  if (!canvas) return;
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `diagrama_${Date.now()}.png`;
+  a.click();
+}
+
 // ── NOTES ──
 let _notesExpanded = false;
 function toggleNotes() {
@@ -3849,6 +4323,7 @@ function toggleNotes() {
 
 // ── DUPLICATE PLAY ──
 function duplicateRow(id) {
+  if (_publicReadonly) return;
   const p=db.teams[currentTeamId].games[currentGameId].plays;
   const i=p.findIndex(x=>x.id===id); if(i===-1) return;
   const copy=Object.assign({},p[i],{id:Date.now()+Math.random()});
@@ -3860,6 +4335,13 @@ function duplicateRow(id) {
 async function initApp() {
   initFilterOptions();
   await initFirebaseClient();
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _installPrompt = e;
+    const btn = document.getElementById('btnInstallApp');
+    if (btn) btn.style.display = '';
+  });
 
   // Atalho de teclado para busca global
   document.addEventListener('keydown', e => {
